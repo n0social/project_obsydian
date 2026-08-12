@@ -81,7 +81,7 @@ These are the current blockers. We are actively debugging and fixing them before
 
 - **World disconnect shortly after Enter World** — server closes the socket (`peer_closed`), most often after Warden cheat-check / memory integrity replies. Maiev string-hash and HASH_REQUEST CR tables are improved; EndScene / MEM-check accuracy is still being hardened.
 - **Character hair missing or wrong in-world** — char-select vs world geoset/texture paths differed; scalp overlays and hair connectors are being aligned with the classic CharSections / CharHairGeosets flow.
-- **Occasional login / realm / create-flow glitches** — wrong screen skips, create preview quirks, or body proportion issues on some races/sexes. Tracked and fixed as they reproduce.
+- **Occasional login / realm / create-flow glitches** — wrong screen skips, create preview quirks, or body proportion issues on some races/sexes. 
 
 If you hit something not listed here, open an issue with device model, realm, and a `wowee.log` snippet.
 
