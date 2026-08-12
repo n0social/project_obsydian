@@ -1,0 +1,8 @@
+# Vendored third-party code (frozen releases, not ours to modify)
+extern/lua-5.1.5/
+extern/imgui/
+extern/stb_image.h
+extern/stb_image_write.h
+extern/vk-bootstrap/
+extern/FidelityFX-FSR2/
+extern/FidelityFX-SDK/

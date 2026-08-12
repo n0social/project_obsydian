@@ -1,0 +1,50 @@
+# Local game client + extracted assets (do not publish)
+/RetroWoW*/
+/retro_wow/
+/WoWee-master.zip
+/vcpkg-master.zip
+/tools-cache/
+
+# WoWee: track engine source; ignore bulky / private trees
+/WoWee/Data/
+/WoWee/assets/
+/WoWee/extern/
+/WoWee/third_party/
+/WoWee/tools/
+/WoWee/build*/
+/WoWee/logs/
+/WoWee/container/
+/WoWee/.cache/
+/WoWee/**/CMakeCache.txt
+/WoWee/**/CMakeFiles/
+
+# Android / Gradle
+android/.gradle/
+android/**/build/
+android/**/.cxx/
+android/local.properties
+android/.idea/
+*.apk
+*.ap_
+*.dex
+*.iml
+
+# IDE / OS
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Native / CMake leftovers
+**/CMakeCache.txt
+**/CMakeFiles/
+**/compile_commands.json
+.cache/
+
+# Secrets / local scratch
+**/.env
+**/login.cfg
+**/credentials*
+tmp_warden_keys.py
+*.log

@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Landscape-first shell: left nav rail + opaque content pane. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/launcher_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/obs_bg"
+    android:orientation="horizontal"
+    android:padding="12dp">
+
+    <LinearLayout
+        android:id="@+id/nav_rail"
+        android:layout_width="240dp"
+        android:layout_height="match_parent"
+        android:background="@drawable/bg_panel_card"
+        android:orientation="vertical"
+        android:padding="12dp">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingStart="8dp"
+            android:paddingTop="8dp"
+            android:paddingBottom="16dp"
+            android:text="@string/app_name"
+            android:textColor="@color/obs_text"
+            android:textSize="22sp"
+            android:textStyle="bold" />
+
+        <Button
+            android:id="@+id/nav_home"
+            style="@style/ObsidianRailButton"
+            android:text="Home" />
+
+        <Button
+            android:id="@+id/nav_signin"
+            style="@style/ObsidianRailButton"
+            android:layout_marginTop="6dp"
+            android:text="Sign in" />
+
+        <Button
+            android:id="@+id/nav_graphics"
+            style="@style/ObsidianRailButton"
+            android:layout_marginTop="6dp"
+            android:text="Graphics" />
+
+        <Button
+            android:id="@+id/nav_audio"
+            style="@style/ObsidianRailButton"
+            android:layout_marginTop="6dp"
+            android:text="Audio" />
+
+        <Button
+            android:id="@+id/nav_controls"
+            style="@style/ObsidianRailButton"
+            android:layout_marginTop="6dp"
+            android:text="Controls" />
+
+        <Button
+            android:id="@+id/nav_paths"
+            style="@style/ObsidianRailButton"
+            android:layout_marginTop="6dp"
+            android:text="Data" />
+
+        <Button
+            android:id="@+id/nav_about"
+            style="@style/ObsidianRailButton"
+            android:layout_marginTop="6dp"
+            android:text="About" />
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1" />
+
+        <Button
+            android:id="@+id/btn_play"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:background="@drawable/bg_primary_button"
+            android:text="Play"
+            android:textAllCaps="false"
+            android:textColor="@color/obs_text"
+            android:textSize="18sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+    <FrameLayout
+        android:id="@+id/content_host"
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_marginStart="12dp"
+        android:layout_weight="1"
+        android:background="@drawable/bg_panel_card"
+        android:padding="20dp">
+
+        <ViewFlipper
+            android:id="@+id/content_flipper"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent">
+
+            <include layout="@layout/panel_home" />
+            <include layout="@layout/panel_signin" />
+            <include layout="@layout/panel_graphics" />
+            <include layout="@layout/panel_audio" />
+            <include layout="@layout/panel_controls" />
+            <include layout="@layout/panel_paths" />
+            <include layout="@layout/panel_about" />
+        </ViewFlipper>
+    </FrameLayout>
+</LinearLayout>

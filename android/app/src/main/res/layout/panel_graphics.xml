@@ -1,0 +1,162 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <TextView
+            style="@style/ObsidianSectionTitle"
+            android:text="Graphics" />
+
+        <TextView
+            style="@style/ObsidianSectionSubtitle"
+            android:text="Applied when you press Play. Tuned for Galaxy Tab A9+ landscape." />
+
+        <TextView
+            style="@style/ObsidianFieldLabel"
+            android:text="Preset" />
+
+        <Spinner
+            android:id="@+id/gfx_preset"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:background="@drawable/bg_secondary_button"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:orientation="horizontal">
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical"
+                android:paddingEnd="10dp">
+
+                <CheckBox
+                    android:id="@+id/gfx_shadows"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Shadows"
+                    android:textColor="@color/obs_text" />
+
+                <CheckBox
+                    android:id="@+id/gfx_fxaa"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="FXAA"
+                    android:textColor="@color/obs_text" />
+
+                <CheckBox
+                    android:id="@+id/gfx_normal_mapping"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Normal mapping"
+                    android:textColor="@color/obs_text" />
+
+                <CheckBox
+                    android:id="@+id/gfx_pom"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Parallax (POM)"
+                    android:textColor="@color/obs_text" />
+
+                <CheckBox
+                    android:id="@+id/gfx_water"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Water refraction"
+                    android:textColor="@color/obs_text" />
+
+                <CheckBox
+                    android:id="@+id/gfx_vsync"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="V-Sync"
+                    android:textColor="@color/obs_text" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical"
+                android:paddingStart="10dp">
+
+                <TextView
+                    style="@style/ObsidianFieldLabel"
+                    android:text="View distance" />
+
+                <SeekBar
+                    android:id="@+id/gfx_view_distance"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:max="2400"
+                    android:min="400" />
+
+                <TextView
+                    android:id="@+id/gfx_view_distance_value"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:textColor="@color/obs_text_muted"
+                    android:textSize="13sp" />
+
+                <TextView
+                    style="@style/ObsidianFieldLabel"
+                    android:text="Shadow distance" />
+
+                <SeekBar
+                    android:id="@+id/gfx_shadow_distance"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:max="600"
+                    android:min="50" />
+
+                <TextView
+                    android:id="@+id/gfx_shadow_distance_value"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:textColor="@color/obs_text_muted"
+                    android:textSize="13sp" />
+
+                <TextView
+                    style="@style/ObsidianFieldLabel"
+                    android:text="Anti-aliasing" />
+
+                <Spinner
+                    android:id="@+id/gfx_aa"
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp"
+                    android:background="@drawable/bg_secondary_button"
+                    android:paddingStart="12dp"
+                    android:paddingEnd="12dp" />
+
+                <TextView
+                    style="@style/ObsidianFieldLabel"
+                    android:text="Ground clutter" />
+
+                <SeekBar
+                    android:id="@+id/gfx_clutter"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:max="200" />
+
+                <TextView
+                    android:id="@+id/gfx_clutter_value"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:textColor="@color/obs_text_muted"
+                    android:textSize="13sp" />
+            </LinearLayout>
+        </LinearLayout>
+    </LinearLayout>
+</ScrollView>

@@ -1,0 +1,15 @@
+{
+  "name": "wowee",
+  "version": "1.0.0",
+  "dependencies": [
+    {
+      "name": "sdl2",
+      "features": [ "vulkan" ]
+    },
+    "openssl",
+    "glm",
+    "zlib",
+    "ffmpeg",
+    "vulkan-headers"
+  ]
+}

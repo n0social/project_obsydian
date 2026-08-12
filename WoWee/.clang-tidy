@@ -1,0 +1,47 @@
+# clang-tidy configuration for WoWee
+# Targets C++20. Checks are tuned for a Vulkan/game-engine codebase:
+#   - reinterpret_cast, pointer arithmetic, and magic numbers are frequent
+#     in low-level graphics/network code, so the most aggressive
+#     cppcoreguidelines and readability-magic-numbers checks are disabled.
+---
+Checks: >
+  bugprone-*, 
+  clang-analyzer-*, 
+  performance-*, 
+  modernize-use-nullptr, 
+  modernize-use-override, 
+  modernize-use-default-member-init, 
+  modernize-use-emplace, 
+  modernize-loop-convert, 
+  modernize-deprecated-headers, 
+  modernize-make-unique, 
+  modernize-make-shared, 
+  modernize-use-nodiscard, 
+  modernize-use-designated-initializers, 
+  readability-braces-around-statements, 
+  readability-container-size-empty, 
+  readability-delete-null-pointer, 
+  readability-else-after-return, 
+  readability-misplaced-array-index, 
+  readability-non-const-parameter, 
+  readability-redundant-control-flow, 
+  readability-redundant-declaration, 
+  readability-simplify-boolean-expr, 
+  readability-string-compare, 
+  -bugprone-easily-swappable-parameters, 
+  -clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling, 
+  -performance-avoid-endl
+
+WarningsAsErrors: ''
+
+# Suppress the noise from GCC-only LTO flags in compile_commands.json.
+# clang doesn't support -fno-fat-lto-objects; this silences the harmless warning.
+ExtraArgs:
+  - -std=c++20
+  - -Wno-ignored-optimization-argument
+
+HeaderFilterRegex: '^.*/include/.*\.hpp$'
+
+CheckOptions:
+- key: modernize-use-default-member-init.UseAssignment
+  value: true

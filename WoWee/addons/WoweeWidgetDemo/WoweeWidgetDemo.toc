@@ -1,0 +1,6 @@
+## Interface: 30300
+## Title: Wowee Widget Demo
+## Notes: Proves the widget system draws. Real Interface art, real anchors.
+## Author: wowee
+
+WoweeWidgetDemo.lua

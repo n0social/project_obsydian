@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <TextView
+            style="@style/ObsidianSectionTitle"
+            android:text="Controls" />
+
+        <TextView
+            style="@style/ObsidianSectionSubtitle"
+            android:text="Obsidian supports USB/BT mouse + keyboard. Touch works for menus (realm / character). Relative mouse look is for in-world camera with a mouse." />
+
+        <CheckBox
+            android:id="@+id/ctrl_relative_mouse"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:checked="false"
+            android:text="Relative mouse look (in-world, mouse)"
+            android:textColor="@color/obs_text" />
+
+        <CheckBox
+            android:id="@+id/ctrl_keep_screen_on"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:checked="true"
+            android:text="Keep screen on while playing"
+            android:textColor="@color/obs_text" />
+
+        <TextView
+            style="@style/ObsidianFieldLabel"
+            android:text="Orientation" />
+
+        <Spinner
+            android:id="@+id/ctrl_orientation"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:background="@drawable/bg_secondary_button"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingTop="16dp"
+            android:text="Default binds follow the desktop client (WASD, hotkeys, chat). Touch UI is not the focus for v1."
+            android:textColor="@color/obs_text_muted"
+            android:textSize="14sp" />
+    </LinearLayout>
+</ScrollView>

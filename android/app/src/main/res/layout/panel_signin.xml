@@ -1,0 +1,166 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Landscape Sign-in: realm left, account right — lives inside the launcher shell. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="horizontal">
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="1"
+        android:orientation="vertical"
+        android:paddingEnd="16dp">
+
+        <TextView
+            style="@style/ObsidianSectionTitle"
+            android:text="Sign in" />
+
+        <TextView
+            style="@style/ObsidianSectionSubtitle"
+            android:text="Realm auth host + account. Use .org for RetroWoW (not .rg / .com)." />
+
+        <TextView
+            style="@style/ObsidianFieldLabel"
+            android:text="Presets" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/signin_preset_retro"
+                android:layout_width="0dp"
+                android:layout_height="44dp"
+                android:layout_weight="1"
+                android:background="@drawable/bg_secondary_button"
+                android:text="RetroWoW"
+                android:textAllCaps="false"
+                android:textColor="@color/obs_text"
+                android:textSize="13sp" />
+
+            <Button
+                android:id="@+id/signin_preset_twinstar"
+                android:layout_width="0dp"
+                android:layout_height="44dp"
+                android:layout_marginStart="8dp"
+                android:layout_weight="1"
+                android:background="@drawable/bg_secondary_button"
+                android:text="TwinStar / Kronos"
+                android:textAllCaps="false"
+                android:textColor="@color/obs_text"
+                android:textSize="13sp" />
+        </LinearLayout>
+
+        <TextView
+            style="@style/ObsidianFieldLabel"
+            android:text="Hostname" />
+
+        <EditText
+            android:id="@+id/signin_host"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:background="@drawable/bg_edit_text"
+            android:hint="logon.retro-wow.org"
+            android:inputType="textUri"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp"
+            android:textColor="@color/obs_text"
+            android:textColorHint="@color/obs_text_muted"
+            android:textSize="15sp" />
+
+        <TextView
+            style="@style/ObsidianFieldLabel"
+            android:text="Port" />
+
+        <EditText
+            android:id="@+id/signin_port"
+            android:layout_width="160dp"
+            android:layout_height="48dp"
+            android:background="@drawable/bg_edit_text"
+            android:inputType="number"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp"
+            android:text="3724"
+            android:textColor="@color/obs_text"
+            android:textSize="15sp" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="1"
+        android:orientation="vertical"
+        android:paddingStart="16dp">
+
+        <TextView
+            style="@style/ObsidianSectionTitle"
+            android:text="Account" />
+
+        <TextView
+            style="@style/ObsidianSectionSubtitle"
+            android:text="Username for this realm (not email on most Vanilla servers)." />
+
+        <TextView
+            style="@style/ObsidianFieldLabel"
+            android:text="Username" />
+
+        <EditText
+            android:id="@+id/signin_username"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:background="@drawable/bg_edit_text"
+            android:inputType="textEmailAddress"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp"
+            android:textColor="@color/obs_text"
+            android:textColorHint="@color/obs_text_muted"
+            android:textSize="15sp" />
+
+        <TextView
+            style="@style/ObsidianFieldLabel"
+            android:text="Password" />
+
+        <EditText
+            android:id="@+id/signin_password"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:background="@drawable/bg_edit_text"
+            android:inputType="textPassword"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp"
+            android:textColor="@color/obs_text"
+            android:textColorHint="@color/obs_text_muted"
+            android:textSize="15sp" />
+
+        <CheckBox
+            android:id="@+id/signin_show_password"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="Show password"
+            android:textColor="@color/obs_text" />
+
+        <TextView
+            android:id="@+id/signin_status"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:textColor="@color/obs_danger"
+            android:textSize="14sp"
+            android:visibility="gone" />
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Press Play in the left rail to enter the client (realm list → characters → world)."
+            android:textColor="@color/obs_text_muted"
+            android:textSize="14sp" />
+    </LinearLayout>
+</LinearLayout>

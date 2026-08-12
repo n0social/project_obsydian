@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="ic_launcher_background">#0D1117</color>
+
+    <!-- Opaque launcher chrome (AetherSX2-style dark shell) -->
+    <color name="obs_bg">#12141A</color>
+    <color name="obs_rail">#0B0D12</color>
+    <color name="obs_panel">#1A1E28</color>
+    <color name="obs_panel_elevated">#232836</color>
+    <color name="obs_stroke">#2E3444</color>
+    <color name="obs_text">#F2F4F8</color>
+    <color name="obs_text_muted">#9AA3B5</color>
+    <color name="obs_accent">#3D7EFF</color>
+    <color name="obs_accent_pressed">#2F66D6</color>
+    <color name="obs_danger">#E25555</color>
+    <color name="obs_ok">#3DCF8E</color>
+</resources>

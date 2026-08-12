@@ -1,0 +1,18 @@
+name: wowee-codeql-config
+
+# Skip vendored third-party libraries. We do not modify upstream code in
+# extern/ (ImGui, miniaudio, stb_*, etc.) — those projects own their own
+# triage and accepting CodeQL findings there blocks our update path and
+# drowns out signal in our own code.
+paths-ignore:
+  - extern
+
+# The WoW client protocol (world-socket header cipher) and Warden anti-cheat
+# module protocol both mandate RC4. There is no way to replace RC4 with a
+# stronger algorithm without breaking compatibility with all supported servers.
+# All RC4 uses in this codebase are protocol-layer obligations, not choices.
+# Exclude the weak-crypto query rather than leaving unfixable high-severity
+# alerts that mislead triage.
+query-filters:
+  - exclude:
+      id: cpp/weak-cryptographic-algorithm

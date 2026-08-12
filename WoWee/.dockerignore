@@ -1,0 +1,48 @@
+# .dockerignore — Exclude files from the Docker build context.
+# Keeps the context small and prevents leaking build artifacts or secrets.
+
+# Build outputs
+build/
+cache/
+
+# Git history
+.git/
+.gitignore
+.github/
+
+# Large external directories (fetched at build time inside the container)
+extern/FidelityFX-FSR2/
+extern/FidelityFX-SDK/
+
+# IDE / editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Documentation (not needed for build)
+docs/
+*.md
+!container/*.md
+
+# Test / tool outputs
+logs/
+
+# Host build scripts that run outside the container (not needed inside)
+build.sh
+build.bat
+build.ps1
+rebuild.sh
+rebuild.bat
+rebuild.ps1
+clean.sh
+extract_assets.*
+extract_warden_rsa.py
+test.sh
+
+# macOS SDK tarballs that may be temporarily placed here
+*.tar.xz
+*.tar.gz
+*.tar.bz2

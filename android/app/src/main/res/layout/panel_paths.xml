@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <TextView
+            style="@style/ObsidianSectionTitle"
+            android:text="Data / Paths" />
+
+        <TextView
+            style="@style/ObsidianSectionSubtitle"
+            android:text="Extracted Vanilla 1.12.1 assets only — no MPQs in the APK." />
+
+        <TextView
+            style="@style/ObsidianFieldLabel"
+            android:text="Data directory" />
+
+        <TextView
+            android:id="@+id/paths_data_dir"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@drawable/bg_secondary_button"
+            android:padding="12dp"
+            android:textColor="@color/obs_text"
+            android:textIsSelectable="true"
+            android:textSize="13sp" />
+
+        <TextView
+            android:id="@+id/paths_manifest_status"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingTop="10dp"
+            android:textColor="@color/obs_text_muted"
+            android:textSize="14sp" />
+
+        <TextView
+            style="@style/ObsidianSectionSubtitle"
+            android:layout_marginTop="16dp"
+            android:text="Realm host and account live under Sign in." />
+    </LinearLayout>
+</ScrollView>

@@ -1,0 +1,81 @@
+<Ui>
+    <!-- Handlers first: the frames below name them. -->
+    <Script file="WoweeXmlDemo.lua"/>
+
+    <!-- A virtual frame is a template. It builds nothing itself; it is replayed
+         onto whatever inherits it, which is how FrameXML shares a look. -->
+    <Frame name="WoweeXmlDemoPanelTemplate" virtual="true">
+        <Layers>
+            <Layer level="BACKGROUND">
+                <Texture name="$parentBackdrop" setAllPoints="true">
+                    <Color r="0" g="0" b="0" a="0.6"/>
+                </Texture>
+            </Layer>
+        </Layers>
+    </Frame>
+
+    <Frame name="WoweeXmlDemoFrame" parent="UIParent" inherits="WoweeXmlDemoPanelTemplate"
+           frameStrata="HIGH" enableMouse="true">
+        <Size><AbsDimension x="240" y="96"/></Size>
+        <Anchors>
+            <Anchor point="CENTER" relativePoint="CENTER">
+                <Offset><AbsDimension x="0" y="-140"/></Offset>
+            </Anchor>
+        </Anchors>
+        <Layers>
+            <Layer level="ARTWORK">
+                <Texture name="$parentIcon" file="Interface\Icons\INV_Misc_Book_09">
+                    <Size><AbsDimension x="48" y="48"/></Size>
+                    <Anchors>
+                        <Anchor point="LEFT" relativePoint="LEFT">
+                            <Offset><AbsDimension x="10" y="0"/></Offset>
+                        </Anchor>
+                    </Anchors>
+                </Texture>
+            </Layer>
+            <Layer level="OVERLAY">
+                <FontString name="$parentTitle" inherits="GameFontNormalLarge" text="Built from XML" justifyH="LEFT">
+                    <Size><AbsDimension x="160" y="18"/></Size>
+                    <Anchors>
+                        <Anchor point="TOPLEFT" relativePoint="TOPLEFT">
+                            <Offset><AbsDimension x="70" y="-14"/></Offset>
+                        </Anchor>
+                    </Anchors>
+                </FontString>
+                <FontString name="$parentCount" inherits="GameFontHighlightSmall" text="clicks: 0" justifyH="LEFT">
+                    <Size><AbsDimension x="160" y="18"/></Size>
+                    <Anchors>
+                        <Anchor point="TOPLEFT" relativeTo="WoweeXmlDemoFrameTitle"
+                                relativePoint="BOTTOMLEFT">
+                            <Offset><AbsDimension x="0" y="-6"/></Offset>
+                        </Anchor>
+                    </Anchors>
+                </FontString>
+            </Layer>
+        </Layers>
+        <Frames>
+            <StatusBar name="WoweeXmlDemoBar">
+                <Size><AbsDimension x="150" y="12"/></Size>
+                <Anchors>
+                    <Anchor point="BOTTOMLEFT" relativePoint="BOTTOMLEFT">
+                        <Offset><AbsDimension x="70" y="14"/></Offset>
+                    </Anchor>
+                </Anchors>
+            </StatusBar>
+        </Frames>
+        <Scripts>
+            <OnLoad function="WoweeXmlDemo_OnLoad"/>
+            <OnClick function="WoweeXmlDemo_OnClick"/>
+            <OnEnter>
+                <![CDATA[
+                    WoweeXmlDemoFrameTitle:SetText("Built from XML (hover)")
+                ]]>
+            </OnEnter>
+            <OnLeave>
+                <![CDATA[
+                    WoweeXmlDemoFrameTitle:SetText("Built from XML")
+                ]]>
+            </OnLeave>
+        </Scripts>
+    </Frame>
+</Ui>

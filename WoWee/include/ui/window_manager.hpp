@@ -1,0 +1,276 @@
+// ============================================================
+// WindowManager — extracted from GameScreen
+// Owns all NPC interaction windows, popup dialogs, and misc
+// overlay UI: loot, gossip, quest, vendor, trainer, mail, bank,
+// auction house, barber, stable, taxi, escape menu, death screen,
+// instance lockouts, achievements, GM ticket, books, titles,
+// equipment sets, skills.
+// ============================================================
+#pragma once
+#include "ui/ui_services.hpp"
+#include <cstdint>
+#include <string>
+#include <unordered_map>
+#include <functional>
+#include <memory>
+#include <vector>
+#include <imgui.h>
+#include <vulkan/vulkan.h>
+
+namespace wowee {
+namespace game { class GameHandler; }
+namespace pipeline { class AssetManager; }
+namespace rendering { class CharacterPreview; }
+namespace ui {
+
+class ChatPanel;
+class SettingsPanel;
+class InventoryScreen;
+class SpellbookScreen;
+
+class WindowManager {
+public:
+    WindowManager() = default;
+    ~WindowManager();
+
+    // Callback type for resolving spell icons (spellId, assetMgr) → VkDescriptorSet
+    using SpellIconFn = std::function<VkDescriptorSet(uint32_t, pipeline::AssetManager*)>;
+
+    // ---- NPC interaction windows ----
+    void renderLootWindow(game::GameHandler& gameHandler,
+                          InventoryScreen& inventoryScreen,
+                          ChatPanel& chatPanel);
+    void renderGossipWindow(game::GameHandler& gameHandler,
+                            ChatPanel& chatPanel);
+    void renderQuestDetailsWindow(game::GameHandler& gameHandler,
+                                  ChatPanel& chatPanel,
+                                  InventoryScreen& inventoryScreen);
+    void renderQuestRequestItemsWindow(game::GameHandler& gameHandler,
+                                       ChatPanel& chatPanel,
+                                       InventoryScreen& inventoryScreen);
+    void renderQuestOfferRewardWindow(game::GameHandler& gameHandler,
+                                      ChatPanel& chatPanel,
+                                      InventoryScreen& inventoryScreen);
+    void renderVendorWindow(game::GameHandler& gameHandler,
+                            InventoryScreen& inventoryScreen,
+                            ChatPanel& chatPanel);
+    void renderTrainerWindow(game::GameHandler& gameHandler,
+                             SpellIconFn getSpellIcon,
+                             InventoryScreen& inventoryScreen);
+    // Standalone crafting window (crafting_window.cpp) — opened by casting a
+    // profession spell (Cooking, First Aid, ...); recipe list with difficulty
+    // colors, reagent counts, and multi-craft controls.
+    void renderCraftingWindow(game::GameHandler& gameHandler,
+                              SpellIconFn getSpellIcon,
+                              InventoryScreen& inventoryScreen);
+    // Recipe difficulty vs current skill (orange/yellow/green/gray), shared by
+    // the trainer panel and the crafting window.
+    static ImVec4 recipeDifficultyColor(game::GameHandler& gameHandler, uint32_t spellId);
+    static const char* recipeDifficultyLabel(game::GameHandler& gameHandler, uint32_t spellId);
+    void renderBarberShopWindow(game::GameHandler& gameHandler);
+    void renderStableWindow(game::GameHandler& gameHandler);
+    void renderTaxiWindow(game::GameHandler& gameHandler);
+
+    // ---- Mail and banking ----
+    void renderMailWindow(game::GameHandler& gameHandler,
+                          InventoryScreen& inventoryScreen,
+                          ChatPanel& chatPanel);
+    void renderMailComposeWindow(game::GameHandler& gameHandler,
+                                 InventoryScreen& inventoryScreen);
+    // Returns true when a persisted bank view option (Combine bags) changed,
+    // so the caller can save settings.
+    bool renderBankWindow(game::GameHandler& gameHandler,
+                          InventoryScreen& inventoryScreen,
+                          ChatPanel& chatPanel);
+    void renderGuildBankWindow(game::GameHandler& gameHandler,
+                               InventoryScreen& inventoryScreen,
+                               ChatPanel& chatPanel);
+    void renderAuctionHouseWindow(game::GameHandler& gameHandler,
+                                  InventoryScreen& inventoryScreen,
+                                  ChatPanel& chatPanel);
+
+    // ---- Popup / overlay windows ----
+    void renderEscapeMenu(SettingsPanel& settingsPanel);
+    void renderLogoutCountdown(game::GameHandler& gameHandler);
+    void renderDeathScreen(game::GameHandler& gameHandler);
+    void renderReclaimCorpseButton(game::GameHandler& gameHandler);
+    void renderInstanceLockouts(game::GameHandler& gameHandler);
+    void renderAchievementWindow(game::GameHandler& gameHandler);
+    void renderGmTicketWindow(game::GameHandler& gameHandler);
+    void renderBookWindow(game::GameHandler& gameHandler);
+    void renderTitlesWindow(game::GameHandler& gameHandler);
+    void renderEquipSetWindow(game::GameHandler& gameHandler);
+    void renderSkillsWindow(game::GameHandler& gameHandler);
+    // Browse/search the GM command reference and send commands to the server.
+    void renderGmCommandScreen(game::GameHandler& gameHandler);
+
+    // ---- State owned by this manager ----
+
+    // GM command screen
+    bool showGmCommandScreen_ = false;
+    char gmSearchBuf_[128] = {};
+    int  gmSelectedIndex_ = -1;      // index into kGmCommands, -1 = none
+    int  gmArgsForIndex_ = -1;       // which selection the arg buffers belong to
+    char gmCommandBuf_[256] = {};    // manual/advanced command line
+    int  gmMaxSecurity_ = 4;         // hide commands above this security level
+    bool gmManualEdit_ = false;      // edit the raw command line instead of fields
+    static constexpr int kGmMaxArgs = 8;
+    char gmArgBuf_[kGmMaxArgs][96] = {}; // per-argument text values
+    int  gmArgChoice_[kGmMaxArgs] = {};  // per-argument combo selection
+
+    // "Max Out Character" quick action: which parts to apply.
+    bool gmMaxLevel_  = true;
+    bool gmMaxSpells_ = true;
+    bool gmMaxTalents_ = true;
+    bool gmMaxSkills_ = true;
+    bool gmMaxGear_   = true;
+    bool gmMaxGold_   = false;
+    // Commands queued by a quick action, drained one per frame so a burst of
+    // .additem/.learn commands doesn't trip server chat flood protection.
+    std::vector<std::string> gmPendingCmds_;
+    size_t gmPendingPos_ = 0;
+    // Build + queue the max-out command sequence for the current class/expansion.
+    void queueMaxOutCharacter(game::GameHandler& gameHandler);
+
+    // Instance lockouts
+    bool showInstanceLockouts_ = false;
+
+    // Achievements
+    bool showAchievementWindow_ = false;
+    char achievementSearchBuf_[128] = {};
+    // Achievement artwork: SpellIcon.dbc ID → path, and resolved textures keyed by icon ID.
+    std::unordered_map<uint32_t, std::string> achievementIconPaths_;
+    std::unordered_map<uint32_t, VkDescriptorSet> achievementIconCache_;
+    bool achievementIconDbLoaded_ = false;
+
+    // Skills / Professions
+    bool showSkillsWindow_ = false;
+
+    // Titles
+    bool showTitlesWindow_ = false;
+
+    // Equipment Sets
+    bool showEquipSetWindow_ = false;
+
+    // GM Ticket
+    bool showGmTicketWindow_     = false;
+    bool gmTicketWindowWasOpen_  = false;
+    char gmTicketBuf_[2048] = {};
+
+    // Book / scroll reader
+    bool showBookWindow_ = false;
+    int  bookCurrentPage_ = 0;
+
+    // Death screen
+    float deathElapsed_ = 0.0f;
+    bool deathTimerRunning_ = false;
+    static constexpr float kForcedReleaseSec = 360.0f;
+
+    // Escape menu
+    bool showEscapeMenu = false;
+
+    // Mail compose
+    char mailRecipientBuffer_[256] = "";
+    char mailSubjectBuffer_[256] = "";
+    char mailBodyBuffer_[2048] = "";
+    int mailComposeMoney_[3] = {0, 0, 0};
+
+    // Vendor
+    char vendorSearchFilter_[128] = "";
+    bool vendorConfirmOpen_ = false;
+    uint64_t vendorConfirmGuid_ = 0;
+    uint32_t vendorConfirmItemId_ = 0;
+    uint32_t vendorConfirmSlot_ = 0;
+    uint32_t vendorConfirmQty_ = 1;
+    uint32_t vendorConfirmPrice_ = 0;
+    std::string vendorConfirmItemName_;
+    bool vendorBagsOpened_ = false;
+    bool guildBankBagsOpened_ = false;
+    // Bank "Combine bags" view (one contiguous grid vs per-bag sections).
+    // Persisted to settings so it survives relaunches.
+    bool bankCombineBags_ = false;
+
+    // Barber shop
+    struct BarberStyleOption {
+        uint32_t entryId = 0;       // BarberShopStyle.dbc ID sent to the server
+        uint8_t appearanceId = 0;   // CharSections/geoset variation used by preview
+        std::string name;
+    };
+    std::vector<BarberStyleOption> barberHairStyles_;
+    std::vector<BarberStyleOption> barberFacialStyles_;
+    std::vector<BarberStyleOption> barberSkinStyles_;
+    std::vector<uint8_t> barberHairColors_;
+    int barberHairStyle_ = 0;
+    int barberHairColor_ = 0;
+    int barberFacialHair_ = 0;
+    int barberSkinColor_ = 0;
+    uint8_t barberOrigHairStyle_ = 0;
+    uint8_t barberOrigHairColor_ = 0;
+    uint8_t barberOrigFacialHair_ = 0;
+    uint8_t barberOrigSkinColor_ = 0;
+    uint8_t barberColorsForHairStyle_ = 0xFF;
+    float barberBaseCost_ = 0.0f;
+    int barberPreviewSkin_ = -1;
+    int barberPreviewHairStyle_ = -1;
+    int barberPreviewHairColor_ = -1;
+    int barberPreviewFacialHair_ = -1;
+    std::unique_ptr<rendering::CharacterPreview> barberPreview_;
+    bool barberInitialized_ = false;
+
+    // Trainer
+    char trainerSearchFilter_[128] = "";
+
+    // Crafting window
+    char craftSearchFilter_[128] = "";
+    uint32_t craftSelectedRecipe_ = 0;
+    int craftQuantity_ = 1;
+    bool craftOnlyMakeable_ = false;
+    // Draggable divider between the recipe list and detail panes. 0 = not yet
+    // initialized (seeded to a proportion of the window on first render).
+    float craftListPaneWidth_ = 0.0f;
+
+    // Auction house
+    char auctionSearchName_[256] = "";
+    int auctionLevelMin_ = 0;
+    int auctionLevelMax_ = 0;
+    int auctionQuality_ = 0;
+    int auctionSellDuration_ = 2;
+    int auctionSellBid_[3] = {0, 0, 0};
+    int auctionSellBuyout_[3] = {0, 0, 0};
+    int auctionSelectedItem_ = -1;
+    int auctionSellSlotIndex_ = -1;   // slot within the selected container
+    int auctionSellBagIndex_ = -1;    // -1 = backpack, 0..3 = equipped bag
+    uint32_t auctionBrowseOffset_ = 0;
+    int auctionItemClass_ = -1;
+    int auctionItemSubClass_ = -1;
+    bool auctionUsableOnly_ = false;
+    int auctionSlotFilter_ = 0;        // index into AH equipment-slot combo (0 = All)
+    bool auctionBuyoutOnly_ = false;   // hide bid-only listings (client-side page filter)
+    int auctionMaxPriceGold_ = 0;      // client-side max buyout in gold (0 = no cap)
+
+    // Guild bank money input
+    int guildBankMoneyInput_[3] = {0, 0, 0};
+
+    // ItemExtendedCost.dbc cache
+    struct ExtendedCostEntry {
+        uint32_t honorPoints = 0;
+        uint32_t arenaPoints = 0;
+        uint32_t itemId[5] = {};
+        uint32_t itemCount[5] = {};
+    };
+    std::unordered_map<uint32_t, ExtendedCostEntry> extendedCostCache_;
+    bool extendedCostDbLoaded_ = false;
+
+    // UIServices injection (Phase B singleton breaking)
+    void setServices(const UIServices& services) { services_ = services; }
+
+private:
+    UIServices services_;
+    void loadExtendedCostDBC();
+    // Resolve an achievement's SpellIcon.dbc ID to an ImGui texture (lazy BLP load + cache).
+    VkDescriptorSet getAchievementIcon(uint32_t spellIconId);
+    std::string formatExtendedCost(uint32_t extendedCostId, game::GameHandler& gameHandler);
+};
+
+} // namespace ui
+} // namespace wowee

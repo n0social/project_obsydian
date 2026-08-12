@@ -1,0 +1,18 @@
+[submodule "extern/imgui"]
+	path = extern/imgui
+	url = https://github.com/ocornut/imgui.git
+	shallow = true
+[submodule "extern/vk-bootstrap"]
+	path = extern/vk-bootstrap
+	url = https://github.com/charles-lunarg/vk-bootstrap.git
+	shallow = true
+[submodule "extern/FidelityFX-SDK"]
+	path = extern/FidelityFX-SDK
+	url = https://github.com/Kelsidavis/FidelityFX-SDK.git
+        shallow = true
+        update = none
+[submodule "extern/FidelityFX-FSR2"]
+	path = extern/FidelityFX-FSR2
+	url = https://github.com/Kelsidavis/FidelityFX-FSR2.git
+	shallow = true
+	ignore = dirty

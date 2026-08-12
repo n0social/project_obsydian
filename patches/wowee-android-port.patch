@@ -1,0 +1,566 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 0860855e..898b111c 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -2,6 +2,9 @@ cmake_minimum_required(VERSION 3.15)
+ project(wowee VERSION 1.0.0 LANGUAGES C CXX)
+ include(GNUInstallDirs)
+ 
++# Root of this tree (safe under add_subdirectory from Obsidian Android).
++set(WOWEE_ROOT ${CMAKE_CURRENT_SOURCE_DIR})
++
+ set(CMAKE_CXX_STANDARD 20)
+ set(CMAKE_CXX_STANDARD_REQUIRED ON)
+ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+@@ -21,6 +24,8 @@ set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
+ if(WIN32)
+     # Needed for Vulkan Win32 external memory/semaphore handle types used by FSR3 interop.
+     add_compile_definitions(VK_USE_PLATFORM_WIN32_KHR WIN32_LEAN_AND_MEAN NOMINMAX)
++elseif(OBSIDIAN_ANDROID OR CMAKE_SYSTEM_NAME STREQUAL "Android")
++    add_compile_definitions(VK_USE_PLATFORM_ANDROID_KHR)
+ endif()
+ 
+ # Options
+@@ -32,11 +37,31 @@ option(WOWEE_ENABLE_AMD_FSR2 "Enable AMD FidelityFX FSR2 backend when SDK is pre
+ option(WOWEE_ENABLE_AMD_FSR3_FRAMEGEN "Enable AMD FidelityFX SDK FSR3 frame generation interface probe when SDK is present" ON)
+ option(WOWEE_BUILD_AMD_FSR3_RUNTIME "Build native AMD FidelityFX VK runtime (Path A) from extern/FidelityFX-SDK/Kits" ON)
+ 
++# Obsidian / Android shared-library port
++option(OBSIDIAN_ANDROID "Build wowee as an Android shared library (Obsidian)" OFF)
++if(CMAKE_SYSTEM_NAME STREQUAL "Android")
++    set(OBSIDIAN_ANDROID ON CACHE BOOL "Build wowee as an Android shared library (Obsidian)" FORCE)
++endif()
++if(OBSIDIAN_ANDROID)
++    message(STATUS "Obsidian Android build: shared library mode")
++    set(WOWEE_BUILD_TESTS OFF CACHE BOOL "" FORCE)
++    set(WOWEE_ENABLE_AMD_FSR2 OFF CACHE BOOL "" FORCE)
++    set(WOWEE_ENABLE_AMD_FSR3_FRAMEGEN OFF CACHE BOOL "" FORCE)
++    set(WOWEE_BUILD_AMD_FSR3_RUNTIME OFF CACHE BOOL "" FORCE)
++    set(WOWEE_ENABLE_TRACY OFF CACHE BOOL "" FORCE)
++    set(WOWEE_ENABLE_ASAN OFF CACHE BOOL "" FORCE)
++    add_compile_definitions(
++        OBSIDIAN_ANDROID=1
++        WOWEE_ANDROID=1
++        VK_USE_PLATFORM_ANDROID_KHR
++    )
++endif()
++
+ # AMD FidelityFX FSR2 SDK detection (drop-in under extern/FidelityFX-FSR2)
+-set(WOWEE_AMD_FSR2_DIR ${CMAKE_SOURCE_DIR}/extern/FidelityFX-FSR2)
++set(WOWEE_AMD_FSR2_DIR ${WOWEE_ROOT}/extern/FidelityFX-FSR2)
+ set(WOWEE_AMD_FSR2_HEADER ${WOWEE_AMD_FSR2_DIR}/src/ffx-fsr2-api/ffx_fsr2.h)
+ set(WOWEE_AMD_FSR2_VK_PERM_HEADER ${WOWEE_AMD_FSR2_DIR}/src/ffx-fsr2-api/vk/shaders/ffx_fsr2_accumulate_pass_permutations.h)
+-set(WOWEE_AMD_FSR2_VK_VENDOR_DIR ${CMAKE_SOURCE_DIR}/third_party/fsr2_vk_permutations)
++set(WOWEE_AMD_FSR2_VK_VENDOR_DIR ${WOWEE_ROOT}/third_party/fsr2_vk_permutations)
+ 
+ # Upstream SDK checkouts may not ship generated Vulkan permutation headers.
+ # If we have a vendored snapshot, copy it into the SDK tree before detection.
+@@ -73,7 +98,7 @@ if(WOWEE_ENABLE_AMD_FSR2 AND EXISTS ${WOWEE_AMD_FSR2_HEADER} AND EXISTS ${WOWEE_
+         ${WOWEE_AMD_FSR2_DIR}/src/ffx-fsr2-api/vk
+         ${WOWEE_AMD_FSR2_DIR}/src/ffx-fsr2-api/vk/shaders
+     )
+-    set(WOWEE_FFX_COMPAT_HEADER ${CMAKE_SOURCE_DIR}/include/third_party/ffx_fsr2_compat.h)
++    set(WOWEE_FFX_COMPAT_HEADER ${WOWEE_ROOT}/include/third_party/ffx_fsr2_compat.h)
+     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+         target_compile_options(wowee_fsr2_amd_vk PRIVATE
+             "-include${WOWEE_FFX_COMPAT_HEADER}"
+@@ -97,7 +122,7 @@ else()
+ endif()
+ 
+ # AMD FidelityFX SDK (FSR3 frame generation interfaces) detection under extern/FidelityFX-SDK
+-set(WOWEE_AMD_FFX_SDK_KITS_DIR ${CMAKE_SOURCE_DIR}/extern/FidelityFX-SDK/Kits/FidelityFX)
++set(WOWEE_AMD_FFX_SDK_KITS_DIR ${WOWEE_ROOT}/extern/FidelityFX-SDK/Kits/FidelityFX)
+ set(WOWEE_AMD_FFX_SDK_KITS_FG_HEADER ${WOWEE_AMD_FFX_SDK_KITS_DIR}/framegeneration/include/ffx_framegeneration.h)
+ 
+ set(WOWEE_AMD_FFX_SDK_KITS_READY FALSE)
+@@ -178,8 +203,8 @@ if(WOWEE_ENABLE_AMD_FSR3_FRAMEGEN AND WOWEE_AMD_FFX_SDK_KITS_READY)
+                     -DFFX_BUILD_VK=ON
+                     -DFFX_BUILD_FRAMEGENERATION=ON
+                     -DFFX_BUILD_UPSCALER=ON
+-                COMMAND ${BASH_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tools/generate_ffx_sdk_vk_permutations.sh
+-                    ${CMAKE_SOURCE_DIR}/extern/FidelityFX-SDK
++                COMMAND ${BASH_EXECUTABLE} ${WOWEE_ROOT}/tools/generate_ffx_sdk_vk_permutations.sh
++                    ${WOWEE_ROOT}/extern/FidelityFX-SDK
+                 COMMAND ${CMAKE_COMMAND}
+                     --build ${WOWEE_AMD_FSR3_RUNTIME_BUILD_DIR}
+                     --config $<CONFIG>
+@@ -233,21 +258,25 @@ endif()
+ find_package(Python3 COMPONENTS Interpreter QUIET)
+ if(Python3_Interpreter_FOUND)
+     add_custom_target(opcodes-generate
+-        COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tools/gen_opcode_registry.py
+-        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
++        COMMAND ${Python3_EXECUTABLE} ${WOWEE_ROOT}/tools/gen_opcode_registry.py
++        WORKING_DIRECTORY ${WOWEE_ROOT}
+         COMMENT "Generating opcode registry include fragments"
+     )
+ 
+     add_custom_target(opcodes-validate
+-        COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tools/validate_opcode_maps.py --root ${CMAKE_SOURCE_DIR}
+-        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
++        COMMAND ${Python3_EXECUTABLE} ${WOWEE_ROOT}/tools/validate_opcode_maps.py --root ${WOWEE_ROOT}
++        WORKING_DIRECTORY ${WOWEE_ROOT}
+         DEPENDS opcodes-generate
+         COMMENT "Validating canonical opcode registry and expansion maps"
+     )
+ endif()
+ 
+ # Find required packages
+-find_package(SDL2 REQUIRED)
++find_package(SDL2 CONFIG REQUIRED)
++# vcpkg arm64-android ships static SDL2 only (no SDL2::SDL2 shared target).
++if(NOT TARGET SDL2::SDL2 AND TARGET SDL2::SDL2-static)
++    add_library(SDL2::SDL2 ALIAS SDL2::SDL2-static)
++endif()
+ find_package(Vulkan QUIET)
+ if(NOT Vulkan_FOUND)
+     # For Windows cross-compilation the host pkg-config finds the Linux libvulkan-dev
+@@ -313,6 +342,18 @@ if(NOT Vulkan_FOUND)
+             set(Vulkan_FOUND TRUE)
+             message(STATUS "Found Vulkan headers for macOS cross-compile via vcpkg VulkanHeaders")
+         endif()
++    elseif(ANDROID OR CMAKE_SYSTEM_NAME STREQUAL "Android")
++        # NDK ships libvulkan.so + headers in the sysroot.
++        find_library(VULKAN_LIB vulkan)
++        if(VULKAN_LIB)
++            if(NOT TARGET Vulkan::Vulkan)
++                add_library(Vulkan::Vulkan INTERFACE IMPORTED)
++            endif()
++            set_target_properties(Vulkan::Vulkan PROPERTIES
++                INTERFACE_LINK_LIBRARIES "${VULKAN_LIB}")
++            set(Vulkan_FOUND TRUE)
++            message(STATUS "Found Vulkan for Android NDK: ${VULKAN_LIB}")
++        endif()
+     else()
+         # Fallback: some distros / CMake versions need pkg-config to locate Vulkan.
+         find_package(PkgConfig QUIET)
+@@ -345,7 +386,7 @@ endif()
+ find_package(OpenSSL REQUIRED)
+ find_package(Threads REQUIRED)
+ find_package(ZLIB REQUIRED)
+-if(WIN32)
++if(WIN32 OR OBSIDIAN_ANDROID OR CMAKE_SYSTEM_NAME STREQUAL "Android")
+     find_package(PkgConfig QUIET)
+ else()
+     find_package(PkgConfig REQUIRED)
+@@ -1067,14 +1108,20 @@ if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
+     target_compile_options(lua51 PRIVATE -w)
+ endif()
+ 
+-# Create executable
+-add_executable(wowee ${WOWEE_SOURCES} ${WOWEE_HEADERS} ${WOWEE_PLATFORM_SOURCES} ${WOWEE_MACOS_SOURCES})
++# Create executable (desktop) or shared library (Android / Obsidian)
++if(OBSIDIAN_ANDROID)
++    add_library(wowee SHARED ${WOWEE_SOURCES} ${WOWEE_HEADERS} ${WOWEE_PLATFORM_SOURCES} ${WOWEE_MACOS_SOURCES})
++    # Do NOT define SDL_MAIN_HANDLED ??? SDL_main.h must rename main ??? SDL_main
++    # so SDLActivity can call it via nativeRunMain().
++else()
++    add_executable(wowee ${WOWEE_SOURCES} ${WOWEE_HEADERS} ${WOWEE_PLATFORM_SOURCES} ${WOWEE_MACOS_SOURCES})
++endif()
+ 
+ # Tracy profiler ??? zero overhead when WOWEE_ENABLE_TRACY is OFF
+ if(WOWEE_ENABLE_TRACY)
+-    target_sources(wowee PRIVATE ${CMAKE_SOURCE_DIR}/extern/tracy/public/TracyClient.cpp)
++    target_sources(wowee PRIVATE ${WOWEE_ROOT}/extern/tracy/public/TracyClient.cpp)
+     target_compile_definitions(wowee PRIVATE TRACY_ENABLE)
+-    target_include_directories(wowee SYSTEM PRIVATE ${CMAKE_SOURCE_DIR}/extern/tracy/public)
++    target_include_directories(wowee SYSTEM PRIVATE ${WOWEE_ROOT}/extern/tracy/public)
+     message(STATUS "Tracy profiler: ENABLED")
+ endif()
+ 
+@@ -1105,10 +1152,10 @@ endif()
+ # is enough to update the version shown in the client.
+ set(WOWEE_VERSION_HEADER ${CMAKE_BINARY_DIR}/generated/core/version.hpp)
+ set(WOWEE_VERSION_SCRIPT_ARGS
+-    -DSRC_DIR=${CMAKE_SOURCE_DIR}
+-    -DIN_FILE=${CMAKE_SOURCE_DIR}/include/core/version.hpp.in
++    -DSRC_DIR=${WOWEE_ROOT}
++    -DIN_FILE=${WOWEE_ROOT}/include/core/version.hpp.in
+     -DOUT_FILE=${WOWEE_VERSION_HEADER}
+-    -P ${CMAKE_SOURCE_DIR}/cmake/GitVersion.cmake
++    -P ${WOWEE_ROOT}/cmake/GitVersion.cmake
+ )
+ # Once now, so the header exists before the first compile.
+ execute_process(COMMAND ${CMAKE_COMMAND} ${WOWEE_VERSION_SCRIPT_ARGS})
+@@ -1147,6 +1194,19 @@ target_link_libraries(wowee PRIVATE
+     ${CMAKE_DL_LIBS}
+ )
+ 
++# Static SDL2 JNI entry points are only referenced from Java. Force the key
++# Android objects out of libSDL2.a so SDLActivity can find them via JNI.
++if(OBSIDIAN_ANDROID OR CMAKE_SYSTEM_NAME STREQUAL "Android")
++    target_link_options(wowee PRIVATE
++        "-Wl,--undefined=Java_org_libsdl_app_SDLActivity_nativeSetupJNI"
++        "-Wl,--undefined=Java_org_libsdl_app_SDLActivity_nativeRunMain"
++        "-Wl,--undefined=Java_org_libsdl_app_SDLAudioManager_nativeSetupJNI"
++        "-Wl,--undefined=Java_org_libsdl_app_SDLControllerManager_nativeSetupJNI"
++        "-Wl,--undefined=Java_org_libsdl_app_HIDDeviceManager_HIDDeviceRegisterCallback"
++        "-Wl,--undefined=Java_org_libsdl_app_SDLInputConnection_nativeCommitText"
++    )
++endif()
++
+ if(HAVE_FFMPEG)
+     target_compile_definitions(wowee PRIVATE HAVE_FFMPEG)
+     target_link_libraries(wowee PRIVATE ${FFMPEG_LIBRARIES})
+@@ -1156,7 +1216,7 @@ if(HAVE_FFMPEG)
+ endif()
+ 
+ # Platform-specific libraries
+-if(UNIX AND NOT APPLE)
++if(UNIX AND NOT APPLE AND NOT OBSIDIAN_ANDROID AND NOT CMAKE_SYSTEM_NAME STREQUAL "Android")
+     target_link_libraries(wowee PRIVATE X11)
+ endif()
+ if(APPLE)
+@@ -1169,6 +1229,27 @@ if(WIN32)
+         target_link_libraries(wowee PRIVATE SDL2::SDL2main)
+     endif()
+ endif()
++if(OBSIDIAN_ANDROID OR CMAKE_SYSTEM_NAME STREQUAL "Android")
++    find_library(ANDROID_LOG_LIB log)
++    find_library(ANDROID_LIB android)
++    target_link_libraries(wowee PRIVATE ${ANDROID_LOG_LIB} ${ANDROID_LIB})
++    # Static SDL2 (vcpkg arm64-android) needs libiconv.
++    find_package(Iconv QUIET)
++    if(Iconv_FOUND)
++        target_link_libraries(wowee PRIVATE Iconv::Iconv)
++    else()
++        find_library(ICONV_LIB iconv)
++        if(ICONV_LIB)
++            target_link_libraries(wowee PRIVATE ${ICONV_LIB})
++        endif()
++    endif()
++    if(TARGET SDL2::SDL2main)
++        target_link_libraries(wowee PRIVATE SDL2::SDL2main)
++    endif()
++    # NDK libvulkan stubs only export Vulkan 1.0; 1.1+ symbols resolve from the
++    # device loader at runtime. Override AGP/NDK -Wl,--no-undefined for this .so.
++    target_link_options(wowee PRIVATE "-Wl,--unresolved-symbols=ignore-all")
++endif()
+ 
+ # Link ImGui if available
+ if(TARGET imgui)
+@@ -1290,22 +1371,25 @@ endif()
+ # Copy assets next to the executable (runs every build, not just configure).
+ # Uses $<TARGET_FILE_DIR:wowee> so MSVC multi-config generators place assets
+ # in bin/Debug/ or bin/Release/ alongside the exe, not the common bin/ parent.
+-add_custom_command(TARGET wowee POST_BUILD
+-    COMMAND ${CMAKE_COMMAND} -E copy_directory
+-        ${CMAKE_CURRENT_SOURCE_DIR}/assets
+-        $<TARGET_FILE_DIR:wowee>/assets
+-    COMMENT "Syncing assets to $<TARGET_FILE_DIR:wowee>/assets"
+-)
+-
+-# Symlink Data/ next to the executable so expansion profiles, opcode tables,
+-# and other runtime data files are found when running from the build directory.
+-if(NOT WIN32)
++# Skip on Android ??? host symlink/copy into the NDK build tree is useless on-device.
++if(NOT OBSIDIAN_ANDROID AND NOT ANDROID)
+     add_custom_command(TARGET wowee POST_BUILD
+-        COMMAND ${CMAKE_COMMAND} -E create_symlink
+-            ${CMAKE_CURRENT_SOURCE_DIR}/Data
+-            $<TARGET_FILE_DIR:wowee>/Data
+-        COMMENT "Symlinking Data to $<TARGET_FILE_DIR:wowee>/Data"
++        COMMAND ${CMAKE_COMMAND} -E copy_directory
++            ${CMAKE_CURRENT_SOURCE_DIR}/assets
++            $<TARGET_FILE_DIR:wowee>/assets
++        COMMENT "Syncing assets to $<TARGET_FILE_DIR:wowee>/assets"
+     )
++
++    # Symlink Data/ next to the executable so expansion profiles, opcode tables,
++    # and other runtime data files are found when running from the build directory.
++    if(NOT WIN32)
++        add_custom_command(TARGET wowee POST_BUILD
++            COMMAND ${CMAKE_COMMAND} -E create_symlink
++                ${CMAKE_CURRENT_SOURCE_DIR}/Data
++                $<TARGET_FILE_DIR:wowee>/Data
++            COMMENT "Symlinking Data to $<TARGET_FILE_DIR:wowee>/Data"
++        )
++    endif()
+ endif()
+ 
+ # On Windows, SDL 2.28+ uses LoadLibraryExW with LOAD_LIBRARY_SEARCH_DEFAULT_DIRS
+@@ -1423,6 +1507,9 @@ else()
+     message(STATUS "  asset_extract tool: DISABLED (requires StormLib)")
+ endif()
+ 
++# Host-only tools (skip on Android / Obsidian shared-library builds)
++if(NOT OBSIDIAN_ANDROID)
++
+ # ---- Tool: dbc_to_csv (DBC ??? CSV text) ----
+ add_executable(dbc_to_csv
+     tools/dbc_to_csv/main.cpp
+@@ -2004,6 +2091,8 @@ set_target_properties(wowee_editor PROPERTIES
+ install(TARGETS wowee_editor RUNTIME DESTINATION bin)
+ message(STATUS "  wowee_editor tool: ENABLED")
+ 
++endif() # NOT OBSIDIAN_ANDROID
++
+ # Print configuration summary
+ message(STATUS "")
+ message(STATUS "Wowee Configuration:")
+@@ -2076,4 +2165,6 @@ chmod +x /usr/local/bin/wowee
+     endif()
+ endif()
+ 
+-include(CPack)
++if(NOT OBSIDIAN_ANDROID)
++    include(CPack)
++endif()
+diff --git a/include/platform/process.hpp b/include/platform/process.hpp
+index 5356b04b..8356ff76 100644
+--- a/include/platform/process.hpp
++++ b/include/platform/process.hpp
+@@ -87,6 +87,9 @@ inline ProcessHandle spawnProcess(const std::vector<std::string>& args) {
+     CloseHandle(pi.hThread);
+     return pi.hProcess;
+ 
++#elif defined(__ANDROID__)
++    (void)args;
++    return INVALID_PROCESS;
+ #else
+     pid_t pid = fork();
+     if (pid == 0) {
+diff --git a/src/audio/activity_sound_manager.cpp b/src/audio/activity_sound_manager.cpp
+index da761ef4..60856787 100644
+--- a/src/audio/activity_sound_manager.cpp
++++ b/src/audio/activity_sound_manager.cpp
+@@ -237,12 +237,19 @@ bool ActivitySoundManager::playOneShot(const std::vector<Sample>& clips, float v
+     std::string filter = "asetrate=44100*" + std::to_string(pitch) +
+                          ",aresample=44100,volume=" + std::to_string(volume);
+ 
++#if defined(__ANDROID__)
++    (void)filter;
++    // Android cannot spawn ffplay; activity oneshots are skipped until a
++    // native miniaudio path covers this sample set.
++    return false;
++#else
+     oneShotPid = platform::spawnProcess({
+         "-nodisp", "-autoexit", "-loglevel", "quiet",
+         "-af", filter, oneShotTempPath
+     });
+ 
+     return oneShotPid != INVALID_PROCESS;
++#endif
+ }
+ 
+ void ActivitySoundManager::startSwimLoop() {
+diff --git a/src/core/config_paths.cpp b/src/core/config_paths.cpp
+index e35d495e..c31e4c38 100644
+--- a/src/core/config_paths.cpp
++++ b/src/core/config_paths.cpp
+@@ -10,6 +10,8 @@
+ #include <windows.h>
+ #elif defined(__APPLE__)
+ #include <mach-o/dyld.h>
++#elif defined(__ANDROID__)
++#include <SDL2/SDL.h>
+ #else
+ #include <unistd.h>
+ #endif
+@@ -54,6 +56,13 @@ std::string getExecutableDir() {
+     // buf includes a trailing NUL from the API; strip to the reported path.
+     if (auto nul = buf.find('\0'); nul != std::string::npos) buf.resize(nul);
+     return fs::path(buf).parent_path().string();
++#elif defined(__ANDROID__)
++    // On Android the "executable dir" is not a useful asset root. Prefer the
++    // app-private files directory so relative Data/config paths resolve.
++    if (const char* internal = SDL_AndroidGetInternalStoragePath()) {
++        if (*internal) return std::string(internal);
++    }
++    return {};
+ #else
+     char buf[4096];
+     ssize_t len = readlink("/proc/self/exe", buf, sizeof(buf));
+diff --git a/src/core/memory_monitor.cpp b/src/core/memory_monitor.cpp
+index b9b2a838..ab3615b6 100644
+--- a/src/core/memory_monitor.cpp
++++ b/src/core/memory_monitor.cpp
+@@ -9,6 +9,8 @@
+ #include <mach/mach.h>
+ #include <sys/types.h>
+ #include <sys/sysctl.h>
++#elif defined(__ANDROID__)
++// Bionic has /proc/meminfo but not glibc sysinfo().
+ #else
+ #include <sys/sysinfo.h>
+ #endif
+@@ -68,6 +70,26 @@ void MemoryMonitor::initialize() {
+         totalRAM_ = kFallbackRAM;
+         LOG_WARNING("Could not detect system RAM, assuming 16GB");
+     }
++#elif defined(__ANDROID__)
++    {
++        // Prefer MemTotal from /proc/meminfo on Android.
++        std::ifstream meminfo("/proc/meminfo");
++        std::string line;
++        size_t totalKb = 0;
++        while (meminfo.is_open() && std::getline(meminfo, line)) {
++            if (line.rfind("MemTotal:", 0) != 0) continue;
++            std::istringstream iss(line.substr(9));
++            iss >> totalKb;
++            break;
++        }
++        if (totalKb > 0) {
++            totalRAM_ = totalKb * 1024ull;
++            LOG_INFO("System RAM detected: ", totalRAM_ / kOneGB, " GB");
++        } else {
++            totalRAM_ = kFallbackRAM;
++            LOG_WARNING("Could not detect system RAM, assuming 16GB");
++        }
++    }
+ #else
+     struct sysinfo info;
+     if (sysinfo(&info) == 0) {
+@@ -112,11 +134,12 @@ size_t MemoryMonitor::getAvailableRAM() const {
+     }
+     return totalRAM_ / 2;
+ #else
+-    // Best source on Linux for reclaimable memory headroom.
++    // Best source on Linux/Android for reclaimable memory headroom.
+     if (size_t memAvailable = readMemAvailableBytesFromProc(); memAvailable > 0) {
+         return memAvailable;
+     }
+ 
++#if !defined(__ANDROID__)
+     struct sysinfo info;
+     if (sysinfo(&info) == 0) {
+         // Fallback approximation if /proc/meminfo is unavailable.
+@@ -125,6 +148,7 @@ size_t MemoryMonitor::getAvailableRAM() const {
+         size_t available = freeBytes + bufferBytes;
+         return (totalRAM_ > 0 && available > totalRAM_) ? totalRAM_ : available;
+     }
++#endif
+     return totalRAM_ / 2;  // Fallback: assume 50% available
+ #endif
+ }
+diff --git a/src/main.cpp b/src/main.cpp
+index 73816e94..afc212a5 100644
+--- a/src/main.cpp
++++ b/src/main.cpp
+@@ -13,7 +13,7 @@
+ #include <libgen.h>
+ #include <unistd.h>
+ #endif
+-#ifdef __linux__
++#if defined(__linux__) && !defined(__ANDROID__)
+ #include <X11/Xlib.h>
+ #include <execinfo.h>
+ #include <unistd.h>
+@@ -31,11 +31,16 @@ static void releaseMouseGrab() {
+         XFlush(g_emergencyDisplay);
+     }
+ }
++#elif defined(__ANDROID__)
++#include <unistd.h>
++#include <libgen.h>
++#include <cstring>
++static void releaseMouseGrab() {}
+ #else
+ static void releaseMouseGrab() {}
+ #endif
+ 
+-#ifdef __linux__
++#if defined(__linux__) && !defined(__ANDROID__)
+ static void crashHandlerSigaction(int sig, siginfo_t* info, void* /*ucontext*/) {
+     releaseMouseGrab();
+     void* frames[64];
+@@ -112,7 +117,7 @@ static void selectMacUserDataPath() {
+ #endif
+ 
+ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[]) {
+-#ifdef __linux__
++#if defined(__linux__) && !defined(__ANDROID__)
+     g_emergencyDisplay = XOpenDisplay(nullptr);
+     // Use sigaction for SIGSEGV/SIGABRT/SIGFPE to get si_addr (faulting address)
+     {
+@@ -153,6 +158,19 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[]) {
+         if (chdir(runtimeDir.c_str()) != 0) {}
+     }
+     selectMacUserDataPath();
++#elif defined(__ANDROID__)
++    {
++        // Prefer the app-private files directory (set by Obsidian / SDLActivity).
++        const char* internal = SDL_AndroidGetInternalStoragePath();
++        if (internal && *internal) {
++            if (chdir(internal) != 0) {}
++            // Default data root: <filesDir>/Data (Obsidian copies extract here).
++            if (!std::getenv("WOW_DATA_PATH") || !*std::getenv("WOW_DATA_PATH")) {
++                const std::string dataPath = std::string(internal) + "/Data";
++                setenv("WOW_DATA_PATH", dataPath.c_str(), 1);
++            }
++        }
++    }
+ #elif defined(__linux__)
+     {
+         char buf[4096];
+@@ -180,7 +198,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[]) {
+         app.shutdown();
+ 
+         LOG_INFO("Application exited successfully");
+-#ifdef __linux__
++#if defined(__linux__) && !defined(__ANDROID__)
+         if (g_emergencyDisplay) { XCloseDisplay(g_emergencyDisplay); g_emergencyDisplay = nullptr; }
+ #endif
+         return 0;
+diff --git a/src/rendering/vk_context.cpp b/src/rendering/vk_context.cpp
+index 4d774dfa..10367d2d 100644
+--- a/src/rendering/vk_context.cpp
++++ b/src/rendering/vk_context.cpp
+@@ -272,8 +272,14 @@ bool VkContext::createInstance(SDL_Window* window) {
+     vkb::InstanceBuilder builder;
+     builder.set_app_name("Wowee")
+            .set_app_version(VK_MAKE_VERSION(1, 0, 0))
++#if defined(__ANDROID__)
++           // Mobile loaders commonly expose 1.1; keep 1.2 features gated at runtime.
++           .require_api_version(1, 1, 0)
++           .set_minimum_instance_version(1, 1, 0);
++#else
+            .require_api_version(1, 2, 0)
+            .set_minimum_instance_version(1, 1, 0);
++#endif
+ 
+     for (auto ext : sdlExts) {
+         builder.enable_extension(ext);
+@@ -325,13 +331,19 @@ bool VkContext::selectPhysicalDevice() {
+     vkb::PhysicalDeviceSelector selector{vkbInstance_};
+     VkPhysicalDeviceFeatures requiredFeatures{};
+     requiredFeatures.samplerAnisotropy = VK_TRUE;
++#if !defined(__ANDROID__)
+     requiredFeatures.fillModeNonSolid = VK_TRUE;  // wireframe debug pipelines
+     requiredFeatures.shaderStorageImageWriteWithoutFormat = VK_TRUE;  // FSR2 compute shaders
+     requiredFeatures.shaderInt16 = VK_TRUE;  // FSR2 compute shaders
++#endif
+     selector.set_surface(surface)
+             .set_minimum_version(1, 1)
+             .set_required_features(requiredFeatures)
++#if defined(__ANDROID__)
++            .prefer_gpu_device_type(vkb::PreferredDeviceType::integrated);
++#else
+             .prefer_gpu_device_type(vkb::PreferredDeviceType::discrete);
++#endif
+ 
+     auto physRet = selector.select();
+     if (!physRet) {
+diff --git a/src/ui/chat/chat_markup_renderer.cpp b/src/ui/chat/chat_markup_renderer.cpp
+index 95cf9bee..2d72e293 100644
+--- a/src/ui/chat/chat_markup_renderer.cpp
++++ b/src/ui/chat/chat_markup_renderer.cpp
+@@ -16,6 +16,8 @@
+ #  define WIN32_LEAN_AND_MEAN
+ #  include <windows.h>
+ #  include <shellapi.h>
++#elif defined(__ANDROID__)
++// No posix_spawn / xdg-open on Android; URL open deferred to platform Intent.
+ #elif defined(__APPLE__)
+ #  include <spawn.h>
+ #  include <sys/wait.h>
+@@ -58,6 +60,9 @@ bool openExternalUrl(const std::string& url) {
+     HINSTANCE rc = ShellExecuteA(nullptr, "open", url.c_str(),
+                                  nullptr, nullptr, SW_SHOWNORMAL);
+     return reinterpret_cast<INT_PTR>(rc) > 32;
++#elif defined(__ANDROID__)
++    (void)url;
++    return false;
+ #else
+ #  if defined(__APPLE__)
+     const char* opener = "/usr/bin/open";
