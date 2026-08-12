@@ -51,6 +51,7 @@ public class MainActivity extends SDLActivity {
 
         File dataDir = ensureDataDirectory();
         File configDir = ObsidianSettings.configDir(this);
+        extractBundledWardenCache(new File(dataDir.getParentFile(), "warden_cache"));
         boolean autoLogin = getIntent() != null
                 && getIntent().getBooleanExtra(EXTRA_AUTO_LOGIN, true);
         try {
@@ -187,6 +188,48 @@ public class MainActivity extends SDLActivity {
         } catch (Throwable ignored) {
         }
         return data;
+    }
+
+    /**
+     * Ship VMaNGOS/RetroWoW Warden challenge tables (.cr) from APK assets into
+     * the writable files tree next to Data/. Native code loads
+     * ./warden_cache/<moduleMd5>.cr for HASH_REQUEST replies.
+     */
+    private void extractBundledWardenCache(File destDir) {
+        try {
+            //noinspection ResultOfMethodCallIgnored
+            destDir.mkdirs();
+            String[] names = getAssets().list("warden_cache");
+            if (names == null || names.length == 0) {
+                Log.i(TAG, "No bundled warden_cache assets");
+                return;
+            }
+            for (String name : names) {
+                if (name == null || !name.endsWith(".cr")) continue;
+                File out = new File(destDir, name);
+                // Refresh if missing or smaller than packaged (upgrade path).
+                long assetSize = -1;
+                try (java.io.InputStream in = getAssets().open("warden_cache/" + name)) {
+                    assetSize = in.available();
+                } catch (Throwable ignored) {
+                }
+                if (out.isFile() && assetSize > 0 && out.length() >= assetSize) {
+                    continue;
+                }
+                try (java.io.InputStream in = getAssets().open("warden_cache/" + name);
+                     java.io.FileOutputStream fos = new java.io.FileOutputStream(out)) {
+                    byte[] buf = new byte[16 * 1024];
+                    int n;
+                    while ((n = in.read(buf)) > 0) {
+                        fos.write(buf, 0, n);
+                    }
+                }
+                Log.i(TAG, "Extracted Warden CR: " + out.getAbsolutePath()
+                        + " (" + out.length() + " bytes)");
+            }
+        } catch (Throwable t) {
+            Log.w(TAG, "Failed to extract bundled warden_cache", t);
+        }
     }
 
     private boolean hasManifest(File data) {

@@ -340,40 +340,108 @@ void WardenHandler::update(float deltaTime) {
 bool WardenHandler::loadWardenCRFile(const std::string& moduleHashHex) {
     wardenCREntries_.clear();
 
-    // Look for .cr file in warden cache
-    std::string cacheBase;
-#ifdef _WIN32
-    if (const char* h = std::getenv("APPDATA")) cacheBase = std::string(h) + "\\wowee\\warden_cache";
-    else cacheBase = ".\\warden_cache";
-#else
-    if (const char* h = std::getenv("HOME")) cacheBase = std::string(h) + "/.local/share/wowee/warden_cache";
-    else cacheBase = "./warden_cache";
-#endif
-    std::string crPath = cacheBase + "/" + moduleHashHex + ".cr";
+    // Build candidate directories. RetroWoW/VMaNGOS HASH_REQUEST is validated
+    // against the module's .cr table — without it we must not invent a hash.
+    std::vector<std::string> cacheDirs;
+    auto addDir = [&](std::string dir) {
+        if (dir.empty()) return;
+        while (!dir.empty() && (dir.back() == '/' || dir.back() == '\\')) dir.pop_back();
+        for (const auto& existing : cacheDirs) {
+            if (existing == dir) return;
+        }
+        cacheDirs.push_back(std::move(dir));
+    };
 
-    std::ifstream crFile(crPath, std::ios::binary);
-    if (!crFile) {
-        LOG_WARNING("Warden: No .cr file found at ", crPath);
+    if (const char* env = std::getenv("WOWEE_WARDEN_CACHE"); env && *env) {
+        addDir(env);
+    }
+    addDir("./warden_cache");
+    addDir("warden_cache");
+    if (const char* dataPath = std::getenv("WOW_DATA_PATH"); dataPath && *dataPath) {
+        std::filesystem::path data(dataPath);
+        addDir((data.parent_path() / "warden_cache").string());
+        addDir((data / "warden").string());
+        addDir((data / "warden_cache").string());
+    }
+#ifdef _WIN32
+    if (const char* h = std::getenv("APPDATA"); h && *h) {
+        addDir(std::string(h) + "\\wowee\\warden_cache");
+    }
+#else
+    if (const char* h = std::getenv("HOME"); h && *h) {
+        addDir(std::string(h) + "/.local/share/wowee/warden_cache");
+    }
+#endif
+
+    std::string upperHex = moduleHashHex;
+    for (char& c : upperHex) {
+        if (c >= 'a' && c <= 'z') c = static_cast<char>(c - 'a' + 'A');
+    }
+
+    std::string crPath;
+    for (const auto& dir : cacheDirs) {
+        const std::string candidates[] = {
+            dir + "/" + moduleHashHex + ".cr",
+            dir + "/" + upperHex + ".cr",
+        };
+        for (const auto& candidate : candidates) {
+            std::error_code existsEc;
+            if (!std::filesystem::is_regular_file(candidate, existsEc)) {
+                continue;
+            }
+            crPath = candidate;
+            break;
+        }
+        if (!crPath.empty()) break;
+    }
+
+    if (crPath.empty()) {
+        LOG_WARNING("Warden: No .cr file found for module ", moduleHashHex,
+                    " (searched ", cacheDirs.size(), " dirs) — HASH_REQUEST cannot be answered");
         return false;
     }
 
-    // Get file size
-    crFile.seekg(0, std::ios::end);
-    auto fileSize = crFile.tellg();
-    crFile.seekg(0, std::ios::beg);
+    std::ifstream crFile(crPath, std::ios::binary);
+    if (!crFile) {
+        LOG_WARNING("Warden: Failed to open .cr at ", crPath);
+        return false;
+    }
 
     // Header: [4 memoryRead][4 pageScanCheck][9 opcodes] = 17 bytes
     constexpr size_t CR_HEADER_SIZE = 17;
     constexpr size_t CR_ENTRY_SIZE = 68; // seed[16]+reply[20]+clientKey[16]+serverKey[16]
 
-    if (static_cast<size_t>(fileSize) < CR_HEADER_SIZE) {
-        LOG_ERROR("Warden: .cr file too small (", fileSize, " bytes)");
+    // Prefer filesystem size — tellg()-as-size_t can become SIZE_MAX on failure
+    // and blow the heap on Android (std::bad_alloc mid MODULE_USE).
+    std::error_code ec;
+    const auto fsSize = std::filesystem::file_size(crPath, ec);
+    if (ec || fsSize < CR_HEADER_SIZE) {
+        LOG_ERROR("Warden: .cr file unreadable/too small at ", crPath,
+                  " (size=", static_cast<uint64_t>(fsSize), " err=", ec.message(), ")");
         return false;
     }
 
-    // Read header: [4 memoryRead][4 pageScanCheck][9 opcodes]
+    const size_t fileSize = static_cast<size_t>(fsSize);
+    size_t entryCount = (fileSize - CR_HEADER_SIZE) / CR_ENTRY_SIZE;
+    if (entryCount == 0 || (fileSize - CR_HEADER_SIZE) % CR_ENTRY_SIZE != 0) {
+        LOG_ERROR("Warden: .cr file has invalid size ", fileSize, " (entries=", entryCount, ")");
+        return false;
+    }
+    // VMaNGOS packs ship ~1000 entries; reject absurd counts before resize.
+    if (entryCount > 8192) {
+        LOG_ERROR("Warden: .cr entry count ", entryCount, " exceeds safe limit");
+        return false;
+    }
+
+    crFile.clear();
+    crFile.seekg(0, std::ios::beg);
+    // Header: [4 memoryRead][4 pageScanCheck][9 opcodes]
     crFile.seekg(8); // skip memoryRead + pageScanCheck
     crFile.read(reinterpret_cast<char*>(wardenCheckOpcodes_), 9);
+    if (!crFile) {
+        LOG_ERROR("Warden: failed reading .cr opcode header from ", crPath);
+        return false;
+    }
     {
         std::string opcHex;
         // CMaNGOS WindowsScanType order:
@@ -387,12 +455,6 @@ bool WardenHandler::loadWardenCRFile(const std::string& moduleHashHex) {
         LOG_DEBUG("Warden: Check opcodes: ", opcHex);
     }
 
-    size_t entryCount = (static_cast<size_t>(fileSize) - CR_HEADER_SIZE) / CR_ENTRY_SIZE;
-    if (entryCount == 0) {
-        LOG_ERROR("Warden: .cr file has no entries");
-        return false;
-    }
-
     wardenCREntries_.resize(entryCount);
     for (size_t i = 0; i < entryCount; i++) {
         auto& e = wardenCREntries_[i];
@@ -400,6 +462,11 @@ bool WardenHandler::loadWardenCRFile(const std::string& moduleHashHex) {
         crFile.read(reinterpret_cast<char*>(e.reply), 20);
         crFile.read(reinterpret_cast<char*>(e.clientKey), 16);
         crFile.read(reinterpret_cast<char*>(e.serverKey), 16);
+        if (!crFile) {
+            LOG_ERROR("Warden: .cr truncated while reading entry ", i, " of ", entryCount);
+            wardenCREntries_.clear();
+            return false;
+        }
     }
 
     LOG_INFO("Warden: Loaded ", entryCount, " CR entries from ", crPath);
@@ -521,7 +588,12 @@ void WardenHandler::handleWardenData(network::Packet& packet) {
                 LOG_DEBUG("Warden: MODULE_USE hash=", hashHex, " size=", wardenModuleSize_);
 
                 // Try to load pre-computed challenge/response entries
-                loadWardenCRFile(hashHex);
+                if (loadWardenCRFile(hashHex)) {
+                    LOG_WARNING("Warden: MODULE_USE — loaded CR table for ", hashHex);
+                } else {
+                    LOG_WARNING("Warden: MODULE_USE — missing CR table for ", hashHex,
+                                " (HASH_REQUEST will fail until .cr is installed)");
+                }
             }
 
             // Respond with MODULE_MISSING to request the module data
@@ -625,18 +697,6 @@ void WardenHandler::handleWardenData(network::Packet& packet) {
             }
 
             std::vector<uint8_t> seed(decrypted.begin() + 1, decrypted.begin() + 17);
-            auto applyWardenSeedRekey = [&](const std::vector<uint8_t>& rekeySeed) {
-                // Derive new RC4 keys from the seed using SHA1Randx.
-                uint8_t newEncryptKey[16], newDecryptKey[16];
-                WardenCrypto::sha1RandxGenerate(rekeySeed, newEncryptKey, newDecryptKey);
-
-                std::vector<uint8_t> ek(newEncryptKey, newEncryptKey + 16);
-                std::vector<uint8_t> dk(newDecryptKey, newDecryptKey + 16);
-                wardenCrypto_->replaceKeys(ek, dk);
-                for (auto& b : newEncryptKey) b = 0;
-                for (auto& b : newDecryptKey) b = 0;
-                LOG_DEBUG("Warden: Derived and applied key update from seed");
-            };
 
             // --- Try CR lookup (pre-computed challenge/response entries) ---
             if (!wardenCREntries_.empty()) {
@@ -649,7 +709,7 @@ void WardenHandler::handleWardenData(network::Packet& packet) {
                 }
 
                 if (match) {
-                    LOG_DEBUG("Warden: HASH_REQUEST — CR entry MATCHED, sending pre-computed reply");
+                    LOG_WARNING("Warden: HASH_REQUEST — CR entry MATCHED, sending pre-computed reply");
 
                     // Send HASH_RESULT
                     std::vector<uint8_t> resp;
@@ -663,60 +723,28 @@ void WardenHandler::handleWardenData(network::Packet& packet) {
                     std::vector<uint8_t> newDecryptKey(match->serverKey, match->serverKey + 16);
                     wardenCrypto_->replaceKeys(newEncryptKey, newDecryptKey);
 
-                    LOG_DEBUG("Warden: Switched to CR key set");
+                    LOG_WARNING("Warden: Switched to CR key set (checkXor=0x",
+                                [&]{ char s[4]; snprintf(s,4,"%02x", wardenCrypto_->checkXorByte()); return std::string(s); }(),
+                                ")");
 
                     wardenState_ = WardenState::WAIT_CHECKS;
                     break;
                 } else {
-                    LOG_DEBUG("Warden: Seed not found in ", wardenCREntries_.size(), " CR entries");
+                    LOG_WARNING("Warden: Seed not found in ", wardenCREntries_.size(), " CR entries");
                 }
             }
 
-            // --- No CR match: decide strategy based on server strictness ---
+            // No CR match (or no .cr loaded). VMaNGOS/RetroWoW memcmp the reply
+            // against the CR table and kick on mismatch ("failed challenge response").
+            // SHA1(module) + SHA1Randx(seed) rekey is wrong and guarantees a kick —
+            // never send a fabricated HASH_RESULT.
             {
                 std::string seedHex;
                 for (auto b : seed) { char s[4]; snprintf(s, 4, "%02x", b); seedHex += s; }
-
-                bool isTurtle = isActiveExpansion("turtle");
-                bool isClassic = (owner_.getBuild() <= 6005) && !isTurtle;
-
-                if (!isTurtle && !isClassic) {
-                    // WotLK/TBC: don't respond to HASH_REQUEST without a valid CR match.
-                    // ChromieCraft/AzerothCore tolerates the silence (no ban, no kick),
-                    // but REJECTS a wrong hash and closes the connection immediately.
-                    // Staying silent lets the server continue the session without Warden checks.
-                    LOG_DEBUG("Warden: HASH_REQUEST seed=", seedHex,
-                                " — no CR match, skipping response (server tolerates silence)");
-                    wardenState_ = WardenState::WAIT_CHECKS;
-                    break;
-                }
-
-                LOG_WARNING("Warden: No CR match (seed=", seedHex,
-                            "), sending fallback hash (lenient server)");
-
-                std::vector<uint8_t> fallbackReply;
-                if (wardenLoadedModule_ && wardenLoadedModule_->isLoaded()) {
-                    const uint8_t* moduleImage = static_cast<const uint8_t*>(wardenLoadedModule_->getModuleMemory());
-                    size_t moduleImageSize = wardenLoadedModule_->getModuleSize();
-                    if (moduleImage && moduleImageSize > 0) {
-                        std::vector<uint8_t> imageData(moduleImage, moduleImage + moduleImageSize);
-                        fallbackReply = auth::Crypto::sha1(imageData);
-                    }
-                }
-                if (fallbackReply.empty()) {
-                    if (!wardenModuleData_.empty())
-                        fallbackReply = auth::Crypto::sha1(wardenModuleData_);
-                    else
-                        fallbackReply.assign(20, 0);
-                }
-
-                std::vector<uint8_t> resp;
-                resp.push_back(0x04); // WARDEN_CMSG_HASH_RESULT
-                resp.insert(resp.end(), fallbackReply.begin(), fallbackReply.end());
-                sendWardenResponse(resp);
-                applyWardenSeedRekey(seed);
+                LOG_ERROR("Warden: HASH_REQUEST seed=", seedHex,
+                          " — no CR match among ", wardenCREntries_.size(),
+                          " entries; refusing fabricated fallback (server would kick)");
             }
-
             wardenState_ = WardenState::WAIT_CHECKS;
             break;
         }
