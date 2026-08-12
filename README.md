@@ -64,10 +64,19 @@ ABIs: **arm64-v8a** (device) and **x86_64** (Windows emulator).
 - [x] Android app shell + SDL2 `SDLActivity` host
 - [x] CMake wiring to build WoWee as `libwowee.so` (needs local `WoWee/` + patch)
 - [x] Crash report hooks (Java)
-- [ ] WoWee cloned and Android patch applied in this workspace
-- [ ] Debug APK that boots on device/emulator
-- [ ] Relative-mouse look verified with USB/BT peripherals
-- [ ] Reliable smoke boot with extracted Data + realm
+- [x] WoWee cloned and Android patch applied in this workspace
+- [x] Debug APK that boots on device/emulator
+- [x] Relative-mouse look verified with USB/BT peripherals
+- [x] Reliable smoke boot with extracted Data + realm
+
+
+## Current Errors
+
+- [ ] Login skips realm select and goes to character creation
+- [ ] Issue with connection to server failing after a few seconds
+- [ ] Characters in character creation section show body dismorphism
+
+
 
 See [STATUS.md](STATUS.md) for the full have vs should-have table.
 
