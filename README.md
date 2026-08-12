@@ -1,10 +1,13 @@
-# Project Obsydian
+# Project Obsydian `[Work in Progress]`
 
-**Started:** July 30, 2026
+**Started:** July 30, 2026  
+**Status:** Active development — not a finished product.
 
 Android client for **Vanilla World of Warcraft 1.12**, built on the open-source [WoWee](https://github.com/Kelsidavis/WoWee) engine (World of Warcraft Engine Experiment).
 
-Early-stage port: SDLActivity host, CMake link of native `libwowee.so`, crash-report hooks, and device/emulator scripts. **Not a playable tablet client yet.** Living status: [STATUS.md](STATUS.md).
+You can boot, authenticate, and enter a 1.12 realm on a tablet in some cases, but session stability and character presentation still have known failures. Treat this repo as an experimental port, not a polished client.
+
+Living detail: [STATUS.md](STATUS.md) · remaining work: [TODO.md](TODO.md)
 
 ## Based on WoWee
 
@@ -14,9 +17,9 @@ Early-stage port: SDLActivity host, CMake link of native `libwowee.so`, crash-re
 |------|--------|
 | Engine | [Kelsidavis/WoWee](https://github.com/Kelsidavis/WoWee) |
 | Expansion target | Vanilla **1.12.1** only |
-| Input | USB / Bluetooth keyboard + mouse |
+| Input | Touch + USB / Bluetooth keyboard + mouse |
 | Assets | BYO extracted `Data/` (no Blizzard assets shipped here) |
-| Servers | External private 1.12 realms (client-only) |
+| Servers | External private 1.12 realms (client-only; tested against RetroWoW) |
 
 ## Repo layout
 
@@ -62,23 +65,33 @@ ABIs: **arm64-v8a** (device) and **x86_64** (Windows emulator).
 
 - [x] Project planning / roadmap
 - [x] Android app shell + SDL2 `SDLActivity` host
-- [x] CMake wiring to build WoWee as `libwowee.so` (needs local `WoWee/` + patch)
+- [x] CMake wiring to build WoWee as `libwowee.so`
 - [x] Crash report hooks (Java)
-- [x] WoWee cloned and Android patch applied in this workspace
-- [x] Debug APK that boots on device/emulator
-- [x] Relative-mouse look verified with USB/BT peripherals
-- [x] Reliable smoke boot with extracted Data + realm
+- [x] Debug APK boots on device/emulator
+- [x] Auth / realm / character select paths on RetroWoW (with VPN where required)
+- [x] Enter world + basic terrain / entity load (unstable — see below)
+- [ ] Stable world session (no Warden / peer kick)
+- [ ] Correct in-world character appearance (hair and related geosets)
+- [ ] Production-ready in-game UI and tablet QoL
 
+## Known issues (actively working)
 
-## Current Errors
+These are the current blockers. We are actively debugging and fixing them before treating the client as “playable”:
 
-- [ ] Login skips realm select and goes to character creation
-- [ ] Issue with connection to server failing after a few seconds
-- [ ] Characters in character creation section show body dismorphism
+- **World disconnect shortly after Enter World** — server closes the socket (`peer_closed`), most often after Warden cheat-check / memory integrity replies. Maiev string-hash and HASH_REQUEST CR tables are improved; EndScene / MEM-check accuracy is still being hardened.
+- **Character hair missing or wrong in-world** — char-select vs world geoset/texture paths differed; scalp overlays and hair connectors are being aligned with the classic CharSections / CharHairGeosets flow.
+- **Occasional login / realm / create-flow glitches** — wrong screen skips, create preview quirks, or body proportion issues on some races/sexes. Tracked and fixed as they reproduce.
 
+If you hit something not listed here, open an issue with device model, realm, and a `wowee.log` snippet.
 
+## What’s next (after the blockers above)
 
-See [STATUS.md](STATUS.md) for the full have vs should-have table.
+Once world stay-alive and character appearance are solid, the focus shifts to quality of life:
+
+- **In-game UI** — usable tablet HUD, bag/action/target flows, clearer disconnect / reconnect messaging
+- **Touch & camera** — look, move, and interact comfort on phones/tablets
+- **Performance & streaming** — terrain load stalls, memory pressure, and VPN-sensitive sockets
+- **Whatever else shows up in real play** — expect more classic-client edge cases (equipment display, spells, NPC interaction, audio, etc.) as sessions last longer
 
 ## Legal
 
@@ -88,5 +101,5 @@ This project ships **engine and app code only**. You must supply your own legall
 
 ## License
 
-Android shell and project docs: see repo files as they land.
+Android shell and project docs: see repo files as they land.  
 WoWee remains under its upstream license — see [WoWee](https://github.com/Kelsidavis/WoWee) (MIT).
