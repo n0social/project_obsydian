@@ -57,7 +57,8 @@ Prerequisites: Android SDK + NDK **30.0.15729638**, vcpkg with `arm64-android` (
 .\scripts\push-game-data.ps1 -SmokeTest
 ```
 
-APK: `android\app\build\outputs\apk\debug\app-debug.apk`
+Latest debug APK (tracked in-repo for testers): [`obsidian-debug.apk`](obsidian-debug.apk)  
+Build output path: `android\app\build\outputs\apk\debug\app-debug.apk`
 
 ABIs: **arm64-v8a** (device) and **x86_64** (Windows emulator).
 

@@ -36,6 +36,8 @@ struct PlayerTextureInfo {
     std::string faceLowerPath;
     std::string faceUpperPath;
     std::string hairTexturePath;
+    std::string scalpLowerPath;
+    std::string scalpUpperPath;
     std::vector<std::string> underwearPaths;
 };
 

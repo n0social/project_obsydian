@@ -11,6 +11,7 @@
 #include "pipeline/dbc_layout.hpp"
 #include "game/game_handler.hpp"
 #include <glm/gtc/matrix_transform.hpp>
+#include <algorithm>
 
 namespace wowee {
 namespace core {
@@ -164,13 +165,22 @@ PlayerTextureInfo AppearanceComposer::resolvePlayerTextures(pipeline::M2Model& m
                 }
             }
             // Section 3 = hair: match variation=hairStyle, color=hairColor
+            // Texture1 = hair mesh (type-6). Texture2/3 = scalp lower/upper overlays
+            // that must be composited onto the body skin or the head looks bald
+            // under the hair cards.
             else if (baseSection == 3 && !foundHair &&
                      variationIndex == charHairStyleId && colorIndex == charHairColorId) {
                 result.hairTexturePath = charSectionsDbc->getString(r, csF.texture1);
+                result.scalpLowerPath = charSectionsDbc->getString(r, csF.texture2);
+                result.scalpUpperPath = charSectionsDbc->getString(r, csF.texture3);
                 if (!result.hairTexturePath.empty()) {
                     foundHair = true;
                     LOG_INFO("  DBC hair texture: ", result.hairTexturePath,
                              " (style=", static_cast<int>(charHairStyleId), " color=", static_cast<int>(charHairColorId), ")");
+                    if (!result.scalpLowerPath.empty() || !result.scalpUpperPath.empty()) {
+                        LOG_INFO("  DBC scalp overlays: lower=", result.scalpLowerPath.empty() ? "(none)" : result.scalpLowerPath,
+                                 " upper=", result.scalpUpperPath.empty() ? "(none)" : result.scalpUpperPath);
+                    }
                 }
             }
             // Section 1 = face: match variation=faceId, colorIndex=skinId
@@ -265,19 +275,23 @@ void AppearanceComposer::compositePlayerSkin(uint32_t modelSlotId, const PlayerT
     if (!charRenderer) return;
 
     // Save skin composite state for re-compositing on equipment changes
-    // Include face textures so compositeWithRegions can rebuild the full base
+    // Include face + scalp textures so compositeWithRegions can rebuild the full base
     bodySkinPath_ = texInfo.bodySkinPath;
     underwearPaths_.clear();
     if (!texInfo.faceLowerPath.empty()) underwearPaths_.push_back(texInfo.faceLowerPath);
     if (!texInfo.faceUpperPath.empty()) underwearPaths_.push_back(texInfo.faceUpperPath);
+    if (!texInfo.scalpLowerPath.empty()) underwearPaths_.push_back(texInfo.scalpLowerPath);
+    if (!texInfo.scalpUpperPath.empty()) underwearPaths_.push_back(texInfo.scalpUpperPath);
     for (const auto& up : texInfo.underwearPaths) underwearPaths_.push_back(up);
 
-    // Composite body skin + face + underwear overlays
+    // Composite body skin + face + scalp hairline + underwear overlays
     {
         std::vector<std::string> layers;
         layers.push_back(texInfo.bodySkinPath);
         if (!texInfo.faceLowerPath.empty()) layers.push_back(texInfo.faceLowerPath);
         if (!texInfo.faceUpperPath.empty()) layers.push_back(texInfo.faceUpperPath);
+        if (!texInfo.scalpLowerPath.empty()) layers.push_back(texInfo.scalpLowerPath);
+        if (!texInfo.scalpUpperPath.empty()) layers.push_back(texInfo.scalpUpperPath);
         for (const auto& up : texInfo.underwearPaths) {
             layers.push_back(up);
         }
@@ -293,7 +307,7 @@ void AppearanceComposer::compositePlayerSkin(uint32_t modelSlotId, const PlayerT
                         if (modelData->textures[ti].type == 1) {
                             charRenderer->setModelTexture(modelSlotId, static_cast<uint32_t>(ti), compositeTex);
                             skinTextureSlotIndex_ = static_cast<uint32_t>(ti);
-                            LOG_INFO("Replaced type-1 texture slot ", ti, " with composited body+face+underwear");
+                            LOG_INFO("Replaced type-1 texture slot ", ti, " with composited body+face+scalp+underwear");
                             break;
                         }
                     }
@@ -339,15 +353,23 @@ std::unordered_set<uint16_t> AppearanceComposer::buildDefaultPlayerGeosets(uint8
     std::unordered_set<uint16_t> activeGeosets;
 
     // Look up the correct hair scalp geoset from CharHairGeosets.dbc
-    uint16_t selectedHairScalp = 1; // default
+    uint16_t selectedHairScalp = 1; // default bald cap
+    bool mapped = false;
     if (entitySpawner_) {
         const auto& hairMap = entitySpawner_->getHairGeosetMap();
         uint32_t hairKey = (static_cast<uint32_t>(raceId) << 16) |
                            (static_cast<uint32_t>(sexId) << 8) |
                            static_cast<uint32_t>(hairStyleId);
         auto it = hairMap.find(hairKey);
-        if (it != hairMap.end() && it->second > 0)
+        if (it != hairMap.end() && it->second > 0) {
             selectedHairScalp = it->second;
+            mapped = true;
+        }
+    }
+    if (!mapped && hairStyleId > 0) {
+        // Match CharacterPreview fallback so create/select and in-world agree
+        // when the DBC map is incomplete.
+        selectedHairScalp = static_cast<uint16_t>(std::max<uint8_t>(hairStyleId + 1, 1));
     }
 
     // Group 0: body base plus exactly one selected hair scalp. Do not enable
@@ -355,9 +377,26 @@ std::unordered_set<uint16_t> AppearanceComposer::buildDefaultPlayerGeosets(uint8
     // unavailable or incomplete, that path activates multiple hair variants.
     activeGeosets.insert(0);  // body base
     activeGeosets.insert(selectedHairScalp);
+    // Group 1 hair connector — NPC humanoid path always pairs scalp with
+    // (100 + scalpId). Without it, many classic hair styles render as a bald
+    // head with missing cards (Night Elf style meshes especially).
+    if (selectedHairScalp > 1) {
+        activeGeosets.insert(static_cast<uint16_t>(100 + selectedHairScalp));
+    } else {
+        activeGeosets.insert(kGeosetDefaultConnector);
+    }
+
+    LOG_INFO("Player hair geosets: race=", static_cast<int>(raceId),
+             " sex=", static_cast<int>(sexId),
+             " style=", static_cast<int>(hairStyleId),
+             " scalp=", selectedHairScalp,
+             " connector=", (selectedHairScalp > 1 ? 100 + selectedHairScalp : 101),
+             mapped ? " (DBC)" : " (fallback)");
 
     // Groups 1xx, 2xx and 3xx are independent facial-feature channels from
     // CharacterFacialHairStyles. They must not be derived from the hairstyle.
+    // Note: geoset100 may collide with the hair connector above; the hair
+    // connector wins when both resolve to the same id.
     if (entitySpawner_) {
         const auto& facialMap = entitySpawner_->getFacialHairGeosetMap();
         uint32_t facialKey = (static_cast<uint32_t>(raceId) << 16) |
@@ -368,18 +407,13 @@ std::unordered_set<uint16_t> AppearanceComposer::buildDefaultPlayerGeosets(uint8
             // A zero means this channel has no feature — a night elf female has
             // none on any of the three. Clamping to 1 handed every character the
             // first variant of all three channels instead.
-            activeGeosets.insert(static_cast<uint16_t>(100 + it->second.geoset100));
-            activeGeosets.insert(static_cast<uint16_t>(200 + it->second.geoset200));
-            activeGeosets.insert(static_cast<uint16_t>(300 + it->second.geoset300));
-        } else {
-            activeGeosets.insert(101);
-            activeGeosets.insert(201);
-            activeGeosets.insert(301);
+            if (it->second.geoset100 > 0)
+                activeGeosets.insert(static_cast<uint16_t>(100 + it->second.geoset100));
+            if (it->second.geoset200 > 0)
+                activeGeosets.insert(static_cast<uint16_t>(200 + it->second.geoset200));
+            if (it->second.geoset300 > 0)
+                activeGeosets.insert(static_cast<uint16_t>(300 + it->second.geoset300));
         }
-    } else {
-        activeGeosets.insert(101);
-        activeGeosets.insert(201);
-        activeGeosets.insert(301);
     }
 
     activeGeosets.insert(kGeosetBareForearms);

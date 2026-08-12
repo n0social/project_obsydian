@@ -104,7 +104,11 @@ inline bool isConnectionClosed(int err) {
            err == WSAESHUTDOWN   ||  // socket shut down
            err == WSAECONNABORTED;   // connection aborted
 #else
-    return err == ENOTCONN || err == ECONNRESET;
+    // Android VPN tunnels often surface peer RST / tunnel teardown as
+    // ECONNABORTED ("Software caused connection abort") rather than ECONNRESET.
+    // Treat it as a closed connection so we dump CLOSE TRACE instead of a bare
+    // Receive-failed line that hides whether Warden or the tunnel died.
+    return err == ENOTCONN || err == ECONNRESET || err == ECONNABORTED;
 #endif
 }
 

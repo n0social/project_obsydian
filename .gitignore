@@ -25,6 +25,8 @@ android/**/.cxx/
 android/local.properties
 android/.idea/
 *.apk
+# Ship the current debug build at repo root for testers
+!obsidian-debug.apk
 *.ap_
 *.dex
 *.iml

@@ -378,32 +378,44 @@ void WardenMemory::patchRuntimeGlobals() {
 
     LOG_WARNING("WardenMemory: Patched SYSINFO chain @0x", std::hex, WARDEN_MODULE_PTR, std::dec);
 
-    // EndScene chain
+    // Graphics device pointer + rendering API kind.
     // VMaNGOS reads g_theGxDevicePtr → device, then device+0x1FC for API kind
-    // (0=OpenGL, 1=Direct3D). If Direct3D, follows device+0x38A8 → ptr → ptr+0xA8 → EndScene.
-    // We set API=1 (Direct3D) and provide the full pointer chain.
+    // (0=OpenGL, 1=Direct3D). Direct3D triggers EndScene locate → MEM_CHECK of
+    // the resolved EndScene bytes (anti-hook). Pointing that at WoW.exe .text
+    // (e.g. 0x401000) fails RetroWoW and gets a delayed peer_closed kick.
+    // Obsidian is Vulkan/OpenGL, and VMaNGOS skips EndScene when API=OpenGL
+    // (sets endSceneAddress=0). Report OpenGL so that stage never runs.
     constexpr uint32_t GX_DEVICE_PTR = 0xC0ED38;
     constexpr uint32_t FAKE_DEVICE   = 0xCE8400;
     writeLE32(GX_DEVICE_PTR, FAKE_DEVICE);
-    writeLE32(FAKE_DEVICE + 0x1FC, 1);                 // API kind = Direct3D
-    // Set up the full EndScene pointer chain at the canonical offsets.
+    writeLE32(FAKE_DEVICE + 0x1FC, 0);  // OpenGL — skip EndScene locate/MEM
+    // Keep a inert D3D-looking chain in case an older scan still walks it,
+    // but park EndScene in BSS with a benign stub (never WoW .text).
     constexpr uint32_t FAKE_VTABLE1 = 0xCE8500;
     constexpr uint32_t FAKE_VTABLE2 = 0xCE8600;
-    constexpr uint32_t FAKE_ENDSCENE = 0x00401000; // start of .text
+    constexpr uint32_t FAKE_ENDSCENE = 0xCE8800;
     writeLE32(FAKE_DEVICE + 0x38A8, FAKE_VTABLE1);
     writeLE32(FAKE_VTABLE1, FAKE_VTABLE2);
     writeLE32(FAKE_VTABLE2 + 0xA8, FAKE_ENDSCENE);
-
-    // The EndScene device+sOfsDevice2 offset may differ from 0x38A8 in Turtle WoW.
-    // Also set API=1 (Direct3D) at multiple offsets so the API kind check passes.
-    // Fill the entire fake device area with the vtable pointer for robustness.
+    // Minimal x86 ret stub so a stray MEM_CHECK of EndScene isn't .text noise.
+    {
+        uint32_t endRva = FAKE_ENDSCENE - imageBase_;
+        if (endRva + 16 <= imageSize_) {
+            static constexpr uint8_t kEndSceneStub[16] = {
+                0x33, 0xC0, 0xC3, 0x90, 0x90, 0x90, 0x90, 0x90,
+                0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90
+            };
+            std::memcpy(image_.data() + endRva, kEndSceneStub, sizeof(kEndSceneStub));
+        }
+    }
     for (uint32_t off = 0x3800; off <= 0x3A00; off += 4) {
         uint32_t addr = FAKE_DEVICE + off;
         if (addr >= imageBase_ && (addr - imageBase_) + 4 <= imageSize_) {
             writeLE32(addr, FAKE_VTABLE1);
         }
     }
-    LOG_WARNING("WardenMemory: Patched EndScene chain @0x", std::hex, GX_DEVICE_PTR, std::dec);
+    LOG_WARNING("WardenMemory: Patched GX device @0x", std::hex, GX_DEVICE_PTR,
+                " API=OpenGL (EndScene skipped)", std::dec);
 
     // WorldEnables
     constexpr uint32_t WORLD_ENABLES = 0xC7B2A4;

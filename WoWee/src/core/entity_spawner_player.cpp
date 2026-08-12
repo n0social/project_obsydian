@@ -354,18 +354,22 @@ void EntitySpawner::spawnOnlinePlayer(uint64_t guid,
     const uint16_t selectedHairScalp = selectHairScalpGeoset(hairGeosetMap_, raceId, genderId, hairStyleId);
     activeGeosets.insert(0);
     activeGeosets.insert(selectedHairScalp);
+    if (selectedHairScalp > 1) {
+        activeGeosets.insert(static_cast<uint16_t>(100 + selectedHairScalp));
+    } else {
+        activeGeosets.insert(101);
+    }
     const uint32_t facialKey = (static_cast<uint32_t>(raceId) << 16) |
                                (static_cast<uint32_t>(genderId) << 8) |
                                static_cast<uint32_t>(facialFeatures);
     auto itFacial = facialHairGeosetMap_.find(facialKey);
     if (itFacial != facialHairGeosetMap_.end()) {
-        activeGeosets.insert(static_cast<uint16_t>(100 + itFacial->second.geoset100));
-        activeGeosets.insert(static_cast<uint16_t>(200 + itFacial->second.geoset200));
-        activeGeosets.insert(static_cast<uint16_t>(300 + itFacial->second.geoset300));
-    } else {
-        activeGeosets.insert(101);
-        activeGeosets.insert(201);
-        activeGeosets.insert(301);
+        if (itFacial->second.geoset100 > 0)
+            activeGeosets.insert(static_cast<uint16_t>(100 + itFacial->second.geoset100));
+        if (itFacial->second.geoset200 > 0)
+            activeGeosets.insert(static_cast<uint16_t>(200 + itFacial->second.geoset200));
+        if (itFacial->second.geoset300 > 0)
+            activeGeosets.insert(static_cast<uint16_t>(300 + itFacial->second.geoset300));
     }
     activeGeosets.insert(kGeosetBareForearms);
     activeGeosets.insert(kGeosetBareShins);
@@ -491,18 +495,22 @@ void EntitySpawner::setOnlinePlayerEquipment(uint64_t guid,
     const uint16_t selectedHairScalp = selectHairScalpGeoset(hairGeosetMap_, st.raceId, st.genderId, hairStyleId);
     geosets.insert(0);
     geosets.insert(selectedHairScalp);
+    if (selectedHairScalp > 1) {
+        geosets.insert(static_cast<uint16_t>(100 + selectedHairScalp));
+    } else {
+        geosets.insert(101);
+    }
     const uint32_t facialKey = (static_cast<uint32_t>(st.raceId) << 16) |
                                (static_cast<uint32_t>(st.genderId) << 8) |
                                static_cast<uint32_t>(st.facialFeatures);
     auto itFacial = facialHairGeosetMap_.find(facialKey);
     if (itFacial != facialHairGeosetMap_.end()) {
-        geosets.insert(static_cast<uint16_t>(100 + itFacial->second.geoset100));
-        geosets.insert(static_cast<uint16_t>(200 + itFacial->second.geoset200));
-        geosets.insert(static_cast<uint16_t>(300 + itFacial->second.geoset300));
-    } else {
-        geosets.insert(101);
-        geosets.insert(201);
-        geosets.insert(301);
+        if (itFacial->second.geoset100 > 0)
+            geosets.insert(static_cast<uint16_t>(100 + itFacial->second.geoset100));
+        if (itFacial->second.geoset200 > 0)
+            geosets.insert(static_cast<uint16_t>(200 + itFacial->second.geoset200));
+        if (itFacial->second.geoset300 > 0)
+            geosets.insert(static_cast<uint16_t>(300 + itFacial->second.geoset300));
     }
     geosets.insert(701);                  // Ears
     geosets.insert(kGeosetDefaultKneepads); // Kneepads
@@ -621,8 +629,12 @@ void EntitySpawner::setOnlinePlayerEquipment(uint64_t guid,
     // HEAD slot is index 0 in the 19-element equipment array
     if (displayInfoIds[0] != 0 && hairStyleId > 0 &&
         core::helmHidesHair(*assetManager_, displayInfoIds[0], st.genderId)) {
-        geosets.erase(selectedHairScalp);                              // Remove style scalp
+        geosets.erase(selectedHairScalp);
+        if (selectedHairScalp > 1) {
+            geosets.erase(static_cast<uint16_t>(100 + selectedHairScalp));
+        }
         geosets.insert(1);    // Bald scalp cap (group 0)
+        geosets.insert(101);  // Default connector
     }
 
     charRenderer->setActiveGeosets(st.instanceId, geosets);

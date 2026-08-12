@@ -146,19 +146,24 @@ std::unordered_set<uint16_t> CharacterPreview::buildBaseGeosets() {
     std::unordered_set<uint16_t> activeGeosets;
     activeGeosets.insert(0); // body base
     activeGeosets.insert(selectedHairScalp);
+    // Pair scalp with group-1 hair connector (same as in-world / NPC path).
+    if (selectedHairScalp > 1) {
+        activeGeosets.insert(static_cast<uint16_t>(100 + selectedHairScalp));
+    } else {
+        activeGeosets.insert(101);
+    }
 
     const uint32_t facialKey = (static_cast<uint32_t>(raceId) << 16) |
                                (static_cast<uint32_t>(sexId) << 8) |
                                static_cast<uint32_t>(facialHair_);
     auto itFacial = facialHairGeosetMap_.find(facialKey);
     if (itFacial != facialHairGeosetMap_.end()) {
-        activeGeosets.insert(static_cast<uint16_t>(100 + itFacial->second.geoset100));
-        activeGeosets.insert(static_cast<uint16_t>(200 + itFacial->second.geoset200));
-        activeGeosets.insert(static_cast<uint16_t>(300 + itFacial->second.geoset300));
-    } else {
-        activeGeosets.insert(101);
-        activeGeosets.insert(201);
-        activeGeosets.insert(301);
+        if (itFacial->second.geoset100 > 0)
+            activeGeosets.insert(static_cast<uint16_t>(100 + itFacial->second.geoset100));
+        if (itFacial->second.geoset200 > 0)
+            activeGeosets.insert(static_cast<uint16_t>(200 + itFacial->second.geoset200));
+        if (itFacial->second.geoset300 > 0)
+            activeGeosets.insert(static_cast<uint16_t>(300 + itFacial->second.geoset300));
     }
 
     // Bare defaults must exist on THIS race's mesh. Gnome has no 501 and

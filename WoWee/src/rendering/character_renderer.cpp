@@ -1268,10 +1268,14 @@ VkTexture* CharacterRenderer::compositeTextures(const std::vector<std::string>& 
             std::string pathLower = layerPaths[layer];
             for (auto& c : pathLower) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
 
-            if (pathLower.find("faceupper") != std::string::npos) {
+            if (pathLower.find("faceupper") != std::string::npos ||
+                pathLower.find("scalpupper") != std::string::npos) {
+                // ScalpUpperHair sits on the Face Upper atlas slot (hairline).
                 dstX = faceUpperRegion256.x; dstY = faceUpperRegion256.y;
                 expectedW256 = faceUpperRegion256.w; expectedH256 = faceUpperRegion256.h;
-            } else if (pathLower.find("facelower") != std::string::npos) {
+            } else if (pathLower.find("facelower") != std::string::npos ||
+                       pathLower.find("scalplower") != std::string::npos) {
+                // ScalpLowerHair sits on the Face Lower atlas slot.
                 dstX = faceLowerRegion256.x; dstY = faceLowerRegion256.y;
                 expectedW256 = faceLowerRegion256.w; expectedH256 = faceLowerRegion256.h;
             } else if (pathLower.find("pelvis") != std::string::npos) {

@@ -163,6 +163,7 @@ void GameScreen::updateCharacterGeosets(game::Inventory& inventory) {
     }
     if (geosets.empty()) {
         geosets.insert(0);
+        geosets.insert(1);   // bald scalp at minimum — never leave group-0 hair empty
         geosets.insert(101);
         geosets.insert(201);
         geosets.insert(301);
@@ -297,10 +298,17 @@ void GameScreen::updateCharacterGeosets(game::Inventory& inventory) {
         if (auto* assets = app.getAssetManager();
             assets && core::helmHidesHair(*assets, headDisplayId, genderId)) {
             for (auto it = geosets.begin(); it != geosets.end();) {
-                if (*it != 0 && (*it / 100) == 0) it = geosets.erase(it);
-                else ++it;
+                // Drop style scalp (group 0, id!=0) and its group-1 hair connector.
+                const uint16_t id = *it;
+                const uint16_t group = id / 100;
+                if ((group == 0 && id != 0) || (group == 1 && id >= 102)) {
+                    it = geosets.erase(it);
+                } else {
+                    ++it;
+                }
             }
             geosets.insert(1);
+            geosets.insert(core::kGeosetDefaultConnector);
         }
     }
 
