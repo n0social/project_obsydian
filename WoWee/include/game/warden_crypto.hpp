@@ -21,8 +21,10 @@ public:
      * Initialize Warden crypto from the 40-byte SRP session key.
      * Derives encrypt (client->server) and decrypt (server->client) RC4 keys
      * using the SHA1Randx / WardenKeyGenerator algorithm.
+     * @param swapKeys If true, swap encrypt/decrypt key assignment (some cores
+     *                 reverse InputKey/OutputKey relative to MaNGOS).
      */
-    bool initFromSessionKey(const std::vector<uint8_t>& sessionKey);
+    bool initFromSessionKey(const std::vector<uint8_t>& sessionKey, bool swapKeys = false);
 
     /**
      * Replace RC4 keys (called after module hash challenge succeeds).
@@ -38,6 +40,14 @@ public:
     /** Encrypt an outgoing CMSG_WARDEN_DATA payload. */
     std::vector<uint8_t> encrypt(const std::vector<uint8_t>& data);
 
+    /**
+     * Trial-decrypt without mutating this instance. Used to pick key order
+     * before committing RC4 state on the first Warden packet.
+     */
+    static std::vector<uint8_t> trialDecrypt(const std::vector<uint8_t>& sessionKey,
+                                             const std::vector<uint8_t>& data,
+                                             bool swapKeys);
+
     bool isInitialized() const { return initialized_; }
 
     /**
@@ -48,8 +58,11 @@ public:
      */
     uint8_t checkXorByte() const { return checkXorByte_; }
 
+    bool keysSwapped() const { return keysSwapped_; }
+
 private:
     bool initialized_;
+    bool keysSwapped_ = false;
     uint8_t checkXorByte_ = 0;
 
     // RC4 state for decrypting incoming packets (server->client)

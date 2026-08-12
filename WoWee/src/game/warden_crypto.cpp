@@ -11,6 +11,7 @@ namespace game {
 
 WardenCrypto::WardenCrypto()
     : initialized_(false)
+    , keysSwapped_(false)
     , checkXorByte_(0)
     , decryptRC4_i_(0)
     , decryptRC4_j_(0)
@@ -65,7 +66,7 @@ void WardenCrypto::sha1RandxGenerate(const std::vector<uint8_t>& seed,
     }
 }
 
-bool WardenCrypto::initFromSessionKey(const std::vector<uint8_t>& sessionKey) {
+bool WardenCrypto::initFromSessionKey(const std::vector<uint8_t>& sessionKey, bool swapKeys) {
     if (sessionKey.size() != 40) {
         LOG_ERROR("Warden: Session key must be 40 bytes, got ", sessionKey.size());
         return false;
@@ -74,6 +75,11 @@ bool WardenCrypto::initFromSessionKey(const std::vector<uint8_t>& sessionKey) {
     uint8_t encryptKey[16];
     uint8_t decryptKey[16];
     sha1RandxGenerate(sessionKey, encryptKey, decryptKey);
+    if (swapKeys) {
+        for (int i = 0; i < 16; ++i) {
+            std::swap(encryptKey[i], decryptKey[i]);
+        }
+    }
 
     // Warden protocol compatibility note:
     // Blizzard's Warden stream crypto is RC4-based; this cannot be upgraded
@@ -83,6 +89,7 @@ bool WardenCrypto::initFromSessionKey(const std::vector<uint8_t>& sessionKey) {
 
     // MaNGOS/AC: check-type XOR byte is InputKey[0] == client encrypt key[0].
     checkXorByte_ = encryptKey[0];
+    keysSwapped_ = swapKeys;
 
     encryptRC4State_.resize(256);
     decryptRC4State_.resize(256);
@@ -98,8 +105,19 @@ bool WardenCrypto::initFromSessionKey(const std::vector<uint8_t>& sessionKey) {
 
     initialized_ = true;
     LOG_INFO("Warden: Crypto initialized from session key (checkXor=0x",
-             [&]{ char s[4]; snprintf(s,4,"%02x",checkXorByte_); return std::string(s); }(), ")");
+             [&]{ char s[4]; snprintf(s,4,"%02x",checkXorByte_); return std::string(s); }(),
+             swapKeys ? ", keys=SWAPPED)" : ")");
     return true;
+}
+
+std::vector<uint8_t> WardenCrypto::trialDecrypt(const std::vector<uint8_t>& sessionKey,
+                                                const std::vector<uint8_t>& data,
+                                                bool swapKeys) {
+    WardenCrypto trial;
+    if (!trial.initFromSessionKey(sessionKey, swapKeys)) {
+        return {};
+    }
+    return trial.decrypt(data);
 }
 
 void WardenCrypto::replaceKeys(const std::vector<uint8_t>& newEncryptKey,

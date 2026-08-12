@@ -58,6 +58,113 @@ int pathCaseScore(const std::string& name) {
     return score;
 }
 
+// Classic MaNGOS check opcodes used for first-packet key-order probing.
+constexpr uint8_t kProbeOps[9] = {
+    0xF3, 0xD9, 0xB2, 0xBF, 0x98, 0x8B, 0x7E, 0x71, 0x57
+};
+
+bool probeIsKnownCheck(uint8_t raw, uint8_t xorByte) {
+    const uint8_t decoded = raw ^ xorByte;
+    for (uint8_t op : kProbeOps) {
+        if (decoded == op) return true;
+    }
+    return false;
+}
+
+// Higher score => more likely a correctly decrypted first Warden packet.
+int scoreWardenPlaintext(const std::vector<uint8_t>& pt, uint8_t checkXor) {
+    if (pt.empty()) return -10000;
+    const uint8_t op = pt[0];
+    if (op > 0x05) return -1000;
+
+    // Penalize near-all-lowercase bodies ONLY when they are NOT a Maiev/Mac
+    // StringHashScan packet ([0x02][len][a-z...] with size == 2+len). Those are
+    // intentionally random lowercase and were wrongly scored as bad decrypts.
+    int lower = 0;
+    for (uint8_t b : pt) {
+        if (b >= 'a' && b <= 'z') ++lower;
+    }
+    const float lowerRatio = static_cast<float>(lower) / static_cast<float>(pt.size());
+    int score = 0;
+    const bool maievFramed = (pt.size() >= 3 && pt[0] == WARDEN_SMSG_CHEAT_CHECKS_REQUEST &&
+                              static_cast<size_t>(2) + pt[1] == pt.size());
+    if (!maievFramed) {
+        if (lowerRatio > 0.85f) score -= 500;
+        else if (lowerRatio > 0.60f) score -= 200;
+    }
+
+    switch (op) {
+        case WARDEN_SMSG_MODULE_USE:
+            if (pt.size() >= 37) score += 1000;
+            else score -= 200;
+            break;
+        case WARDEN_SMSG_MODULE_CACHE:
+            if (pt.size() >= 3) score += 400;
+            break;
+        case WARDEN_SMSG_HASH_REQUEST:
+            if (pt.size() >= 17) score += 800;
+            break;
+        case WARDEN_SMSG_MODULE_INITIALIZE:
+            score += 300;
+            break;
+        case WARDEN_SMSG_CHEAT_CHECKS_REQUEST: {
+            if (pt.size() < 3) {
+                score -= 300;
+                break;
+            }
+            score += 100;
+
+            // VMaNGOS Maiev / Mac StringHashScan: [0x02][len][a-z...] with NO
+            // Windows string-table or xor trailer. Size is exactly 2+len, and the
+            // body is often near-100% lowercase — that is *valid*, not a bad key.
+            {
+                const uint8_t slen = pt[1];
+                if (static_cast<size_t>(2) + slen == pt.size() && slen > 0) {
+                    int az = 0;
+                    for (size_t i = 2; i < pt.size(); ++i) {
+                        if (pt[i] >= 'a' && pt[i] <= 'z') ++az;
+                    }
+                    if (az * 2 >= static_cast<int>(slen)) {
+                        score += 800; // strong Maiev/Mac string-hash signal
+                        break;
+                    }
+                    score += 350; // exact size framing still likely Maiev/Mac
+                    break;
+                }
+            }
+
+            const uint8_t xorByte = checkXor;
+            size_t checkEnd = (pt.back() == checkXor) ? pt.size() - 1 : pt.size();
+            size_t pos = 1;
+            int strings = 0;
+            bool tableOk = false;
+            while (pos < checkEnd) {
+                uint8_t slen = pt[pos++];
+                if (slen == 0) { tableOk = true; break; }
+                if (pos + slen > checkEnd) break;
+                // Printable-ish string?
+                int printable = 0;
+                for (size_t i = 0; i < slen; ++i) {
+                    uint8_t c = pt[pos + i];
+                    if (c >= 32 && c < 127) ++printable;
+                }
+                if (slen > 0 && printable * 2 >= static_cast<int>(slen)) ++strings;
+                pos += slen;
+            }
+            if (tableOk) score += 200 + strings * 40;
+            if (pos < checkEnd && probeIsKnownCheck(pt[pos], xorByte)) score += 300;
+            // Immediate TIMING after empty table (with or without 0x00).
+            if (pt.size() > 2 && pt[1] == 0x00 && probeIsKnownCheck(pt[2], checkXor)) score += 400;
+            if (probeIsKnownCheck(pt[1], checkXor)) score += 250;
+            break;
+        }
+        default:
+            score -= 100;
+            break;
+    }
+    return score;
+}
+
 std::string resolveCaseInsensitiveDataPath(const std::string& dataRoot, const std::string& wowPath) {
     if (dataRoot.empty() || wowPath.empty()) return std::string();
     std::filesystem::path cur(dataRoot);
@@ -312,15 +419,40 @@ void WardenHandler::handleWardenData(network::Packet& packet) {
         wardenPacketsAfterGate_ = 0;
     }
 
-    // Initialize Warden crypto from session key on first packet
+    // Initialize Warden crypto from session key on first packet.
+    // Probe both MaNGOS key orders — RetroWoW's first packet was decrypting to
+    // ~99% lowercase ASCII under the default order (false CHEAT_CHECKS).
     if (!wardenCrypto_) {
-        wardenCrypto_ = std::make_unique<WardenCrypto>();
         if (owner_.getSessionKey().size() != 40) {
             LOG_ERROR("Warden: No valid session key (size=", owner_.getSessionKey().size(), "), cannot init crypto");
-            wardenCrypto_.reset();
             return;
         }
-        if (!wardenCrypto_->initFromSessionKey(owner_.getSessionKey())) {
+        const auto& sk = owner_.getSessionKey();
+        auto trialNormal = WardenCrypto::trialDecrypt(sk, data, false);
+        auto trialSwapped = WardenCrypto::trialDecrypt(sk, data, true);
+
+        uint8_t xorNormal = 0;
+        uint8_t xorSwapped = 0;
+        {
+            uint8_t ek[16], dk[16];
+            WardenCrypto::sha1RandxGenerate(sk, ek, dk);
+            xorNormal = ek[0];
+            xorSwapped = dk[0]; // after swap, encrypt key is former decrypt key
+        }
+        const int scoreNormal = scoreWardenPlaintext(trialNormal, xorNormal);
+        const int scoreSwapped = scoreWardenPlaintext(trialSwapped, xorSwapped);
+        const bool useSwap = scoreSwapped > scoreNormal;
+
+        LOG_WARNING("Warden: key-order probe normalScore=", scoreNormal,
+                    " swappedScore=", scoreSwapped,
+                    " normalOp=0x",
+                    [&]{ char s[4]; snprintf(s,4,"%02x", trialNormal.empty()?0xff:trialNormal[0]); return std::string(s); }(),
+                    " swappedOp=0x",
+                    [&]{ char s[4]; snprintf(s,4,"%02x", trialSwapped.empty()?0xff:trialSwapped[0]); return std::string(s); }(),
+                    useSwap ? " -> SWAPPED" : " -> normal");
+
+        wardenCrypto_ = std::make_unique<WardenCrypto>();
+        if (!wardenCrypto_->initFromSessionKey(sk, useSwap)) {
             LOG_ERROR("Warden: Failed to initialize crypto from session key");
             wardenCrypto_.reset();
             return;
@@ -597,6 +729,62 @@ void WardenHandler::handleWardenData(network::Packet& packet) {
                 break;
             }
 
+            // VMaNGOS Maiev / Mac StringHashScan (and RetroWoW's first packets):
+            //   SMSG: [0x02][strlen][string...]   size == 2+strlen, NO xor trailer
+            //   CMSG: [0x02][SHA1 20][MD5 16]     NO Windows len/checksum header
+            //
+            // Critical VMaNGOS detail (WardenScan.cpp StringHashScan::GetChecker):
+            //   while m_maiev (no module): SHA1(string) ONLY — do NOT append 0xFEEDFACE
+            //   after module load:        SHA1(string || LE 0xFEEDFACE)
+            // RetroWoW starts with CHEAT_CHECKS (never MODULE_USE first) → Maiev path.
+            // Our previous FEEDFACE replies matched tomrus88 Mac stubs and got us kicked.
+            {
+                const uint8_t strLen = decrypted[1];
+                if (static_cast<size_t>(2) + strLen == decrypted.size() && strLen > 0) {
+                    std::vector<uint8_t> strBytes(decrypted.begin() + 2,
+                                                   decrypted.begin() + 2 + strLen);
+
+                    int az = 0, printable = 0;
+                    for (uint8_t c : strBytes) {
+                        if (c >= 'a' && c <= 'z') ++az;
+                        if (c >= 32 && c < 127) ++printable;
+                    }
+                    const bool looksLikeMaievString =
+                        (az * 2 >= static_cast<int>(strLen)) ||
+                        (printable * 4 >= static_cast<int>(strLen) * 3);
+
+                    if (looksLikeMaievString) {
+                        // Maiev (pre-module): SHA1(string) + MD5(string)
+                        auto sha = auth::Crypto::sha1(strBytes);
+                        auto md = auth::Crypto::md5(strBytes);
+
+                        std::vector<uint8_t> resp;
+                        resp.reserve(1 + sha.size() + md.size());
+                        resp.push_back(WARDEN_CMSG_CHEAT_CHECKS_RESULT);
+                        resp.insert(resp.end(), sha.begin(), sha.end());
+                        resp.insert(resp.end(), md.begin(), md.end());
+                        sendWardenResponse(resp);
+
+                        std::string preview;
+                        preview.reserve(std::min<size_t>(strLen, 48));
+                        for (size_t i = 0; i < strBytes.size() && i < 48; ++i) {
+                            char c = static_cast<char>(strBytes[i]);
+                            preview.push_back((c >= 32 && c < 127) ? c : '.');
+                        }
+                        if (strBytes.size() > 48) preview += "...";
+
+                        LOG_WARNING("Warden: Maiev string-hash (len=", (int)strLen,
+                                    ", no FEEDFACE) preview=\"", preview,
+                                    "\" — sent SHA1+MD5 (", resp.size(), " bytes plaintext)");
+                        wardenState_ = WardenState::WAIT_CHECKS;
+                        break;
+                    }
+
+                    LOG_WARNING("Warden: size matches [02][len][body] but body is not "
+                                "Maiev/Mac string — falling through to Windows parse");
+                }
+            }
+
             // MaNGOS/AC XOR check types with InputKey[0] (client encrypt key[0]).
             // The trailer is usually that same byte, but RetroWoW (and some forks) may
             // omit a matching trailer — never trust packet.back() alone.
@@ -696,17 +884,10 @@ void WardenHandler::handleWardenData(network::Packet& packet) {
                 } else if (checkEndEarly > 1 && isKnownCheckWire(decrypted[1])) {
                     // No string terminator — checks begin immediately after opcode.
                     recovered = 1;
-                } else {
-                    // Scan for first TIMING/MEM/etc wire byte near the front.
-                    for (size_t cand = 1; cand < checkEndEarly && cand < 48; ++cand) {
-                        if (isKnownCheckWire(decrypted[cand])) {
-                            recovered = cand;
-                            break;
-                        }
-                    }
                 }
+                // Do NOT scan deeper for "known" wire bytes — random body bytes
+                // false-positive as MPQ/MEM and we send truncated replies that get us kicked.
                 if (recovered != 0) {
-                    // Rebuild string table for the bytes between opcode and check start.
                     strings.clear();
                     size_t p = 1;
                     while (p < recovered) {
@@ -724,6 +905,9 @@ void WardenHandler::handleWardenData(network::Packet& packet) {
                     checkBytes = (checkEndEarly > pos) ? (checkEndEarly - pos) : 0;
                     LOG_WARNING("Warden: recovered check stream at offset ", pos,
                                 " (strings=", strings.size(), ", checkBytes=", checkBytes, ")");
+                } else {
+                    LOG_ERROR("Warden: cannot frame CHEAT_CHECKS — refusing to send a partial reply");
+                    break;
                 }
             }
 
@@ -1460,18 +1644,19 @@ void WardenHandler::handleWardenData(network::Packet& packet) {
                 }
             }
 
-            // Never answer with an empty result body — RetroWoW closes the peer immediately.
-            if (resultData.empty()) {
-                LOG_WARNING("Warden: no checks parsed — sending TIMING-only fallback response");
-                resultData.push_back(0x01);
-                uint32_t ticks = static_cast<uint32_t>(
-                    std::chrono::duration_cast<std::chrono::milliseconds>(
-                        std::chrono::steady_clock::now().time_since_epoch()).count());
-                resultData.push_back(ticks & 0xFF);
-                resultData.push_back((ticks >> 8) & 0xFF);
-                resultData.push_back((ticks >> 16) & 0xFF);
-                resultData.push_back((ticks >> 24) & 0xFF);
-                checkCount = std::max(checkCount, 1);
+            // Never answer with a truncated body — RetroWoW closes the peer.
+            // Prefer silence over a wrong TIMING-only stub when framing failed.
+            if (resultData.empty() || checkCount == 0) {
+                LOG_ERROR("Warden: no usable checks parsed — not sending CHEAT_CHECKS_RESULT");
+                break;
+            }
+            // If we stopped on UNKNOWN mid-stream, result is incomplete → kick risk.
+            // Detect: parse stopped before checkEnd with last action unknown is already logged;
+            // require we consumed the framed check region.
+            if (pos < checkEnd) {
+                LOG_ERROR("Warden: check stream truncated at pos=", pos, "/", checkEnd,
+                          " (incomplete resultSize=", resultData.size(), ") — not sending");
+                break;
             }
 
             // Log synchronous round summary at WARNING level for diagnostics
