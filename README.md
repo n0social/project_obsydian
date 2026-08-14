@@ -100,6 +100,40 @@ This project ships **engine and app code only**. You must supply your own legall
 
 `retro_wow/` (if present) is a local original-client tree for your own use. It is gitignored. WoWee still needs a **loose-file extract** (`Data/expansions/classic/manifest.json`), not raw MPQs.
 
+Minimum Specs (30–60 FPS)
+Targeting 1280x800 or 1080p scaled rendering on medium graphics settings. Handles solo questing, world traversal, and 5-man dungeons without severe thermal throttling.
+
+System on Chip (SoC): Qualcomm Snapdragon 870 or MediaTek Dimensity 8300 / 9000
+
+CPU: Octa-Core (1x Prime Core @ 3.2 GHz Cortex-A77 + 3x Performance Cores @ 2.4 GHz + 4x Efficiency Cores)
+
+GPU: Adreno 650 or Mali-G710 (Requires Vulkan 1.1+ support with stable extension handling)
+
+System RAM: 8 GB LPDDR5
+
+Internal Storage: 128 GB UFS 3.1 (Minimum read speeds of ~1,800 MB/s to prevent asset streaming hitches)
+
+Thermal System: Passive Vapor Chamber / Large-surface area aluminum chassis
+
+OS / Software: Android 11+
+
+Recommended Specs (60–120 FPS)
+Targeting Native 2K Resolution (2560x1600) on high settings. Handles dense capital cities, 20/40-man raid encounters, heavy add-on UIs, and continuous MPQ streaming with zero shader compilation micro-stutters.
+
+System on Chip (SoC): Qualcomm Snapdragon 8 Gen 2 or Snapdragon 8+ Gen 1
+
+CPU: Octa-Core (1x Cortex-X3 Prime Core @ 3.2 GHz + 4x Performance Cores @ 2.8 GHz + 3x Efficiency Cores)
+
+GPU: Adreno 740 or Adreno 730 (Fully compliant Vulkan 1.3 support with low-latency pipeline caching)
+
+System RAM: 12 GB – 16 GB LPDDR5X
+
+Internal Storage: 256 GB UFS 4.0 (Ultra-fast read speeds of ~4,000 MB/s for instantaneous MPQ data archive inflation)
+
+Thermal System: Dual-layer Vapor Chamber / Active Thermal Bypass Charging support
+
+OS / Software: Android 13+
+
 ## License
 
 Android shell and project docs: see repo files as they land.  
