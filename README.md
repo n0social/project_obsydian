@@ -100,6 +100,7 @@ This project ships **engine and app code only**. You must supply your own legall
 
 `retro_wow/` (if present) is a local original-client tree for your own use. It is gitignored. WoWee still needs a **loose-file extract** (`Data/expansions/classic/manifest.json`), not raw MPQs.
 
+## Specs
 Minimum Specs (30–60 FPS)
 Targeting 1280x800 or 1080p scaled rendering on medium graphics settings. Handles solo questing, world traversal, and 5-man dungeons without severe thermal throttling.
 
