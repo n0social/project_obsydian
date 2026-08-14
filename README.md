@@ -102,7 +102,7 @@ This project ships **engine and app code only**. You must supply your own legall
 
 ## Specs
 
-Minimum Specs (30–60 FPS)
+**Minimum Specs** (30–60 FPS)
 Targeting 1280x800 or 1080p scaled rendering on medium graphics settings. Handles solo questing, world traversal, and 5-man dungeons without severe thermal throttling.
 
 System on Chip (SoC): Qualcomm Snapdragon 870 or MediaTek Dimensity 8300 / 9000
@@ -119,7 +119,7 @@ Thermal System: Passive Vapor Chamber / Large-surface area aluminum chassis
 
 OS / Software: Android 11+
 
-Recommended Specs (60–120 FPS)
+**Recommended Specs** (60–120 FPS)
 Targeting Native 2K Resolution (2560x1600) on high settings. Handles dense capital cities, 20/40-man raid encounters, heavy add-on UIs, and continuous MPQ streaming with zero shader compilation micro-stutters.
 
 System on Chip (SoC): Qualcomm Snapdragon 8 Gen 2 or Snapdragon 8+ Gen 1
